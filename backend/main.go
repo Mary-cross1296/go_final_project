@@ -5,12 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"strconv"
 	"syscall"
 )
 
-func HttpServer(port, wd string, server *http.Server) {
+func HttpServer(port, wd string, server *http.Server, sigs chan os.Signal) {
 	//var httpServer *http.Server
 	// Определение обработчика для корневого пути
 	requestHandler := http.FileServer(http.Dir(wd))
@@ -38,22 +37,20 @@ func main() {
 	httpServer := &http.Server{
 		Addr: ":" + port, // Установка адреса сервера
 	}
-	fmt.Println(httpServer.Addr)
 
-	// Запуск сервера
-	HttpServer(port, webDir, httpServer)
-
+	// Канал для сигналов
 	sigs := make(chan os.Signal, 1)
 	var sig os.Signal
 
+	// Запуск сервера
+	go HttpServer(port, webDir, httpServer, sigs)
+
 	for {
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGBUS, syscall.SIGSEGV)
 		sig = <-sigs
-		fmt.Println()
 		fmt.Println("signal:", sig)
 		if sig == syscall.SIGINT || sig == syscall.SIGTERM {
 			break
 		}
 	}
-
+	httpServer.Close()
 }
