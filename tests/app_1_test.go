@@ -21,11 +21,17 @@ func getURL(path string) string {
 			port = int(eport)
 		}
 	}
-	path = strings.ReplaceAll(strings.TrimPrefix(path, `../web/`), `\`, `/`)
+	path = strings.TrimPrefix(path, "..\\web\\")
+	path = strings.TrimPrefix(path, "../web/")
+
+	path = strings.ReplaceAll(path, `\`, `/`)
+
 	return fmt.Sprintf("http://localhost:%d/%s", port, path)
 }
 
 func getBody(path string) ([]byte, error) {
+	url := getURL(path)
+	fmt.Println("Нужно нам", url)
 	resp, err := http.Get(getURL(path))
 	if err != nil {
 		return nil, err
