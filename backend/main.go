@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +11,10 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"database/sql"
+
+	_ "modernc.org/sqlite"
 )
 
 type Scheduler struct {
@@ -52,8 +55,19 @@ func ChekingDataBase() error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	dbFile := filepath.Join(filepath.Dir(appPath), tableName)
-	_, err = os.Stat(dbFile)
+
+	// Определение пути к файлу БД. Создаем две переменные:
+	// в первой dbFile путь из переменной окружения
+	// во второй dbFileDefualt путь к базе данных по умолчанию
+	dbFile := os.Getenv("TODO_DBFILE")
+	dbFileDefualt := filepath.Join(filepath.Dir(appPath), tableName)
+	if dbFile == "" {
+		dbFile = dbFileDefualt
+		_, err = os.Stat(dbFile)
+		if err != nil {
+			fmt.Printf("Database file information missing: %s \nA new database file will be created... \n", err)
+		}
+	}
 
 	var install bool
 	if err != nil {
@@ -63,17 +77,18 @@ func ChekingDataBase() error {
 	if install == true {
 		// если install равен true, после открытия БД требуется выполнить
 		// sql-запрос с CREATE TABLE и CREATE INDEX
-		db, err := sql.Open("sqlite", "scheduler.db")
+		db, err := sql.Open("sqlite", tableName)
 		if err != nil {
 			fmt.Printf("Error opening database: %s", err)
 			return fmt.Errorf(err.Error())
 		}
 		defer db.Close()
-		CreateTableWithIndex(db, tableName)
+		CreateTableWithIndex(db)
 	}
+	return nil
 }
 
-func CreateTableWithIndex(db *sql.DB, tableName string) error {
+func CreateTableWithIndex(db *sql.DB) error {
 	createTableRequest := `
 	CREATE TABLE scheduler (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,11 +106,12 @@ func CreateTableWithIndex(db *sql.DB, tableName string) error {
 		return err
 	}
 
-	_, err = db.Exec(createIndexRequest, tableName)
+	_, err = db.Exec(createIndexRequest)
 	if err != nil {
 		fmt.Printf("Error creating index: %s", err)
 		return err
 	}
+	return nil
 }
 
 func main() {
