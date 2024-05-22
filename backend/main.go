@@ -67,6 +67,7 @@ func ChekingDataBase() error {
 		if err != nil {
 			fmt.Printf("Database file information missing: %s \nA new database file will be created... \n", err)
 		}
+		fmt.Println("The database already exists")
 	}
 
 	var install bool
