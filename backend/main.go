@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,8 +12,6 @@ import (
 	"strconv"
 	"syscall"
 	"time"
-
-	"database/sql"
 
 	_ "modernc.org/sqlite"
 )
@@ -51,7 +50,7 @@ func HttpServer(port, wd string) *http.Server {
 func ChekingDataBase() error {
 	tableName := "scheduler.db"
 
-	appPath, err := os.Getwd()
+	appPath, err := os.Executable()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,13 +60,14 @@ func ChekingDataBase() error {
 	// во второй dbFileDefualt путь к базе данных по умолчанию
 	dbFile := os.Getenv("TODO_DBFILE")
 	dbFileDefualt := filepath.Join(filepath.Dir(appPath), tableName)
+
 	if dbFile == "" {
 		dbFile = dbFileDefualt
 		_, err = os.Stat(dbFile)
 		if err != nil {
 			fmt.Printf("Database file information missing: %s \nA new database file will be created... \n", err)
 		} else {
-			fmt.Println("The database already exists")
+			fmt.Println("The database file already exists")
 		}
 	}
 
