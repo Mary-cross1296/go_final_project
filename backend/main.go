@@ -243,7 +243,7 @@ func СalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (st
 			}
 			daysNum = append(daysNum, dayNum)
 		}
-		СalculatMonthlyDayTask(now, startDate, daysNum)
+		СalculatDayOfMonthTask(now, startDate, daysNum)
 	}
 
 	// Пока мы не знаем, какая перед нами комбинация
@@ -269,13 +269,13 @@ func СalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (st
 			}
 			monthsNum = append(monthsNum, monthNum)
 		}
-		СalculatDayАndMonthTask(now, startDate, dayNum, monthsNum)
+		СalculatDayOfMonthsTask(now, startDate, dayNum, monthsNum)
 	}
 
 	return "", nil
 }
 
-func СalculatMonthlyDayTask(now time.Time, startDate time.Time, daysNum []int) (string, error) {
+func СalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (string, error) {
 	nowTime := now.Format("20060102")
 	nowDate, _ := time.Parse("20060102", nowTime)
 
@@ -295,7 +295,7 @@ func СalculatMonthlyDayTask(now time.Time, startDate time.Time, daysNum []int) 
 	return "", nil
 }
 
-func СalculatDayАndMonthTask(now time.Time, startDate time.Time, dayNum int, monthsNum []int) (string, error) {
+func СalculatDayOfMonthsTask(now time.Time, startDate time.Time, dayNum int, monthsNum []int) (string, error) {
 	return "", nil
 }
 
