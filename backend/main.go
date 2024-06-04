@@ -192,6 +192,11 @@ func СalculatWeeklyTask(now time.Time, startDate time.Time, repeat string) (str
 		dayNum, err := strconv.Atoi(dayStr)
 		if err != nil {
 			fmt.Printf("Error converting string to number: %s", err)
+			return "", err
+		}
+		if dayNum < 1 || dayNum > 7 {
+			err = errors.New("invalid number of days of weeks")
+			return "", err
 		}
 		daysWeekNum = append(daysWeekNum, dayNum)
 	}
@@ -206,7 +211,7 @@ func СalculatWeeklyTask(now time.Time, startDate time.Time, repeat string) (str
 	// Заводим счетчик, чтобы цикл не выполнялся бесконечно
 	counter := 0
 	for nextDate.After(now) {
-		if counter >= 30 {
+		if counter >= 14 {
 			return "", errors.New("Next date for task not found")
 		}
 
@@ -218,6 +223,80 @@ func СalculatWeeklyTask(now time.Time, startDate time.Time, repeat string) (str
 		nextDate = nextDate.AddDate(0, 0, 1)
 		counter++
 	}
+}
+
+func СalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (string, error) {
+	daysMonthStr := strings.TrimPrefix(repeat, "m ")
+	daysMonth := strings.Split(daysMonthStr, " ")
+
+	// Длина полученного слайса = 1, говорит о том, что мы имеем дело только с днями месяца
+	if len(daysMonth) == 1 {
+		days := daysMonth[0]
+		daysStr := strings.Split(days, ",")
+
+		var daysNum []int
+		for _, day := range daysStr {
+			dayNum, err := strconv.Atoi(day)
+			if err != nil {
+				fmt.Printf("Error converting string to number: %s", err)
+				return "", err
+			}
+			daysNum = append(daysNum, dayNum)
+		}
+		СalculatMonthlyDayTask(now, startDate, daysNum)
+	}
+
+	// Пока мы не знаем, какая перед нами комбинация
+	// день + месяцы
+	// дни + месяцы
+	numList1 := strings.Split(daysMonth[0], ",")
+	numList2 := strings.Split(daysMonth[1], ",")
+
+	// День + месяцы
+	if len(numList1) == 1 {
+		// Преобразуем единственный элемент первого массива в число
+		// Получаем день задачи
+		dayNum, _ := strconv.Atoi(numList1[0])
+
+		// Преобразуем элементы второго массива в числа
+		// Создаем новый числовой массив
+		var monthsNum []int
+		for _, month := range numList2 {
+			monthNum, err := strconv.Atoi(month)
+			if err != nil {
+				fmt.Printf("Error converting string to number: %s", err)
+				return "", err
+			}
+			monthsNum = append(monthsNum, monthNum)
+		}
+		СalculatDayАndMonthTask(now, startDate, dayNum, monthsNum)
+	}
+
+	return "", nil
+}
+
+func СalculatMonthlyDayTask(now time.Time, startDate time.Time, daysNum []int) (string, error) {
+	nowTime := now.Format("20060102")
+	nowDate, _ := time.Parse("20060102", nowTime)
+
+	// Находим следующий день после текущей даты now
+	nextDate := nowDate.AddDate(0, 0, 1)
+
+	// Перебираем дни после текущей даты и сравниваем с числом из массива дней
+	for nextDate.After(now) {
+		for _, day := range daysNum {
+			// Если день из массива равен дню проверяемой даты, то назначаем выполнение задачи
+			if day == nextDate.Day() {
+				return nextDate.Format("20060102"), nil
+			}
+			nextDate = nextDate.AddDate(0, 0, 1)
+		}
+	}
+	return "", nil
+}
+
+func СalculatDayАndMonthTask(now time.Time, startDate time.Time, dayNum int, monthsNum []int) (string, error) {
+	return "", nil
 }
 
 func main() {
