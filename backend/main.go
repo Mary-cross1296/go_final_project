@@ -27,27 +27,47 @@ type Scheduler struct {
 	Repeat  string
 }
 
-func HttpServer(port, wd string, handlers map[string]http.HandlerFunc) *http.Server {
+// Обработчик запросов на /api/nextdate.
+func NextDateHandler(w http.ResponseWriter, r *http.Request) {
+	// Получаем Get-параметры из запроса
+	nowTime := r.FormValue("now")
+	date := r.FormValue("date")
+	repeat := r.FormValue("repeat")
+
+	// Преобразуем параметр "now" в формат time.Time
+	now, err := time.Parse("20060102", nowTime)
+	if err != nil {
+		http.Error(w, "Invalid 'now' parameter format. Use YYYYMMDD", http.StatusBadRequest)
+		return
+	}
+
+	// Вызываем функцию NextDate для получения следующей даты
+	nextDate, err := NextDate(now, date, repeat)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Отправляем следующий ответ клиенту
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(nextDate))
+}
+
+func StaticFileHandler(wd string) {
+	staticHandler := http.FileServer(http.Dir(wd))
+	http.Handle("/", staticHandler)
+}
+
+func HttpServer(port, wd string) *http.Server {
 	// Создание объект сервера
 	httpServer := http.Server{
 		Addr: ":" + port, // Установка адреса сервера
 	}
 
-	// Определение обработчика для корневого пути
-	mux := http.NewServeMux()
-	requestHandler := http.FileServer(http.Dir(wd))
-	mux.Handle("/", requestHandler)
-
-	// Настройка сервера
-	//httpServer.Handler = requestHandler
-
-	// Добавление пользовательских обработчиков
-	for path, handler := range handlers {
-		mux.Handle(path, handler)
-	}
-
-	// Присваивание mux полю Handler сервера
-	httpServer.Handler = mux
+	// Обработчик статических файлов
+	StaticFileHandler(wd)
+	// Обработчики запросов
+	http.HandleFunc("api/nextdate", NextDateHandler)
 
 	// Запуск сервера на указанном порту
 	log.Printf("Сервер запущен на порту %v\n", port)
@@ -585,41 +605,6 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 	}
 }
 
-// Обработчик запросов на /api/nextdate.
-func NextDateHandler(w http.ResponseWriter, r *http.Request) {
-	// Получаем Get-параметры из запроса
-	nowTime := r.FormValue("now")
-	date := r.FormValue("date")
-	repeat := r.FormValue("repeat")
-	//nowTime := r.URL.Query().Get("now")
-	//date := r.URL.Query().Get("date")
-	//repeat := r.URL.Query().Get("repeat")
-
-	// Преобразуем параметр "now" в формат time.Time
-	now, err := time.Parse("20060102", nowTime)
-	if err != nil {
-		http.Error(w, "Invalid 'now' parameter format. Use YYYYMMDD", http.StatusBadRequest)
-		return
-	}
-
-	// Вызываем функцию NextDate для получения следующей даты
-	nextDate, err := NextDate(now, date, repeat)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Возвращаем следующую дату задачи
-	fmt.Printf("Next date: %s \n", nextDate)
-
-	// Отправляем следующий ответ клиенту
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(nextDate))
-
-	// Отладочное сообщение
-	log.Printf("Received request for next date. Now: %s, Date: %s, Repeat: %s. Next date: %s", nowTime, date, repeat, nextDate)
-}
-
 func main() {
 	// Определение порта
 	port := os.Getenv("TODO_PORT")
@@ -631,17 +616,9 @@ func main() {
 	// Определение директории для файлов
 	webDir := "../web"
 
-	// Мапинг обработчиков
-	handlers := map[string]http.HandlerFunc{
-		"/api/nextdate": NextDateHandler,
-	}
-
 	// Запуск сервера
-	server := HttpServer(port, webDir, handlers)
+	server := HttpServer(port, webDir)
 	ChekingDataBase()
-
-	// Устанавливаем обработчик для api/nextdate
-	http.HandleFunc("/api/nextdate", NextDateHandler)
 
 	// Создание канала для поступления сигналов
 	sigs := make(chan os.Signal, 1)
