@@ -238,23 +238,23 @@ func CalculatWeeklyTask(now time.Time, startDate time.Time, repeat string) (stri
 		}
 		daysWeekNum = append(daysWeekNum, dayNum)
 	}
+	fmt.Printf("Отладка daysWeekNum %v \n", daysWeekNum)
 
-	// Находим следующий день после текущего now
-	nextDate := startDate
-	for now.After(nextDate) || now == nextDate {
-		nextDate = nextDate.AddDate(0, 0, 1)
+	nextDate := startDate                         // Если now находится в прошлом относительно startDate
+	if now == startDate || now.After(startDate) { // Если now равно startDate или если now в будущем относительно starDate
+		nextDate = now.AddDate(0, 0, 1)
 	}
 
 	// Перебираем дни после найденного nextDate и сравниваем с числами из массива
 	// Заводим счетчик, чтобы цикл не выполнялся бесконечно
 	counter := 0
 	for nextDate.After(now) {
-		if counter > 8 {
-			return "", errors.New("Next date for task not found")
+		if counter > 14 {
+			return "", errors.New("next date for task not found")
 		}
 
 		for _, dayWeek := range daysWeekNum {
-			if dayWeek == int(nextDate.Weekday()) {
+			if dayWeek == int(nextDate.Weekday()) || (dayWeek == 7 && nextDate.Weekday() == 0) {
 				return nextDate.Format("20060102"), nil
 			}
 		}
@@ -341,6 +341,7 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 
 	// Текущая(now) дата в прошлом относитительно даты старта(startDate)
 	nextDate := startDate
+
 	if now == startDate {
 		nextDate = startDate.AddDate(0, 0, 1)
 	}
@@ -399,6 +400,8 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 	///////////////////////////////////////////////////////////////////////////////
 
 	// Текущая дата(now) в будущем относительно старта(startDate)
+	nextDate = startDate
+
 	if now == startDate || now.After(startDate) {
 		nextDate = now.AddDate(0, 0, 1)
 	} else {
