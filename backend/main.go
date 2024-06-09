@@ -364,7 +364,6 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 			// то вычисляем следующую дату задачи
 			if day < 0 && negativeNum == 1 {
 				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-				fmt.Printf("отладка allegedNextDate %v", allegedNextDate)
 
 				if nextDate.Day() >= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() &&
@@ -380,10 +379,7 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 				day2 := daysNum[1]
 
 				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				fmt.Printf("отладка allegedNextDate1 %v", allegedNextDate1)
-
 				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-				fmt.Printf("отладка allegedNextDate2 %v", allegedNextDate2)
 
 				// Вычисляем дату, которая происходит раньше
 				if allegedNextDate1.Day() >= nextDate.Day() &&
@@ -410,7 +406,6 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 			// то вычисляем следующую дату задачи
 			if day < 0 && negativeNum == 1 {
 				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-				fmt.Printf("отладка allegedNextDate %v", allegedNextDate)
 
 				if nextDate.Day() >= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() &&
@@ -426,10 +421,7 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 				day2 := daysNum[1]
 
 				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				fmt.Printf("отладка allegedNextDate1 %v", allegedNextDate1)
-
 				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-				fmt.Printf("отладка allegedNextDate2 %v", allegedNextDate2)
 
 				// Вычисляем дату, которая происходит раньше
 				if allegedNextDate1.Day() >= nextDate.Day() &&
@@ -496,7 +488,6 @@ outerLoop:
 			// то вычисляем следующую дату задачи
 			if day < 0 && negativeNum == 1 {
 				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-				fmt.Printf("отладка allegedNextDate %v", allegedNextDate)
 
 				if nextDate.Day() >= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() &&
@@ -512,10 +503,7 @@ outerLoop:
 				day2 := daysNum[1]
 
 				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				fmt.Printf("отладка allegedNextDate1 %v", allegedNextDate1)
-
 				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-				fmt.Printf("отладка allegedNextDate2 %v", allegedNextDate2)
 
 				// Вычисляем дату, которая происходит раньше
 				if allegedNextDate1.Day() >= nextDate.Day() &&
@@ -542,7 +530,6 @@ outerLoop:
 			// то вычисляем следующую дату задачи
 			if day < 0 && negativeNum == 1 {
 				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-				fmt.Printf("отладка allegedNextDate %v", allegedNextDate)
 
 				if nextDate.Day() >= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() &&
@@ -558,10 +545,7 @@ outerLoop:
 				day2 := daysNum[1]
 
 				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				fmt.Printf("отладка allegedNextDate1 %v", allegedNextDate1)
-
 				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-				fmt.Printf("отладка allegedNextDate2 %v", allegedNextDate2)
 
 				// Вычисляем дату, которая происходит раньше
 				if allegedNextDate1.Day() >= nextDate.Day() &&
