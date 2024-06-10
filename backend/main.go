@@ -177,6 +177,58 @@ func PreliminaryNextDate(now time.Time, startDate time.Time) (time.Time, error) 
 	return time.Time{}, fmt.Errorf("TentativeNextDate() could not predetermine the next date")
 }
 
+func NowBeforeNextDate(now time.Time, nextDate time.Time, negativeNum int, minNumDay int, daysNum []int) (string, error) {
+	for _, day := range daysNum {
+		// Проверка даты для положительного числа из массива
+		if day > 0 && day == nextDate.Day() {
+			return nextDate.Format("20060102"), nil
+		}
+
+		if len(daysNum) == 1 && negativeNum == 1 {
+			allegedNextDate := CalculatAllegedNextDate(nextDate, day)
+
+			if nextDate.Day() <= allegedNextDate.Day() {
+				return allegedNextDate.Format("20060102"), nil
+			}
+		}
+
+		// Если день из массива отрицательное число при этом в массиве одно отрицательное число,
+		// то вычисляем следующую дату задачи
+		if day < 0 && negativeNum == 1 {
+			allegedNextDate := CalculatAllegedNextDate(nextDate, day)
+
+			if nextDate.Day() <= minNumDay &&
+				nextDate.Day() <= allegedNextDate.Day() {
+				nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
+				return nextDate.Format("20060102"), nil
+			} else if nextDate.Day() >= minNumDay &&
+				nextDate.Day() <= allegedNextDate.Day() {
+				return allegedNextDate.Format("20060102"), nil
+			}
+		}
+
+		// Если день из массива отрицательное число (при этом в массиве два отрицательных числа),
+		// то вычисляем следующую дату задачи следующим образом
+		if day < 0 && negativeNum == 2 {
+			day1 := daysNum[0]
+			day2 := daysNum[1]
+
+			allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
+			allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
+
+			// Вычисляем дату, которая происходит раньше
+			if allegedNextDate1.Day() >= nextDate.Day() &&
+				allegedNextDate2.Day() > nextDate.Day() {
+				return allegedNextDate2.Format("20060102"), nil
+			} else {
+				return allegedNextDate1.Format("20060102"), nil
+			}
+		}
+	}
+	nextDate = nextDate.AddDate(0, 0, 1)
+	return "", nil
+}
+
 func CalculatAllegedNextDate(nextDate time.Time, day int) time.Time {
 	// Устанавливаем предполагаемую следующую дату задания на 1 число текущего месяца
 	allegedNextDate := time.Date(nextDate.Year(), nextDate.Month(), 1, 0, 0, 0, 0, nextDate.Location())
@@ -382,109 +434,9 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 	// Ищем мининимально число в массиве daysNum
 	minNumDay := FindMinNum(daysNum, negativeNum)
 
-	// Текущая(now) дата в прошлом относитительно даты старта(startDate)
+	// Расчет nextDate в функции PreliminaryNextDate, позволяет всегда выполняться условию now.Before(nextDate)
 	for now.Before(nextDate) {
-		for _, day := range daysNum {
-			// Если день из массива положительное число и равен дню проверяемой даты, то назначаем выполнение задачи
-			if day > 0 && day == nextDate.Day() {
-				return nextDate.Format("20060102"), nil
-			}
-
-			if len(daysNum) == 1 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число при этом в массиве одно отрицательное число,
-			// то вычисляем следующую дату задачи
-			if day < 0 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
-					return nextDate.Format("20060102"), nil
-				} else if nextDate.Day() >= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число (при этом в массиве два отрицательных числа),
-			// то вычисляем следующую дату задачи следующим образом
-			if day < 0 && negativeNum == 2 {
-				day1 := daysNum[0]
-				day2 := daysNum[1]
-
-				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-
-				// Вычисляем дату, которая происходит раньше
-				if allegedNextDate1.Day() >= nextDate.Day() &&
-					allegedNextDate2.Day() > nextDate.Day() {
-					return allegedNextDate2.Format("20060102"), nil
-				} else {
-					return allegedNextDate1.Format("20060102"), nil
-				}
-			}
-		}
-		nextDate = nextDate.AddDate(0, 0, 1)
-	}
-
-	// Текущая дата(now) в будущем относительно старта(startDate)
-	// Перебираем дни после текущей даты и сравниваем с числом из массива дней
-	for nextDate.After(now) {
-		for _, day := range daysNum {
-			// Если день из массива положительное число и равен дню проверяемой даты, то назначаем выполнение задачи
-			if day > 0 && day == nextDate.Day() {
-				return nextDate.Format("20060102"), nil
-			}
-
-			if len(daysNum) == 1 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число при этом в массиве одно отрицательное число,
-			// то вычисляем следующую дату задачи
-			if day < 0 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
-					return nextDate.Format("20060102"), nil
-				} else if nextDate.Day() >= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число (при этом в массиве два отрицательных числа),
-			// то вычисляем следующую дату задачи следующим образом
-			if day < 0 && negativeNum == 2 {
-				day1 := daysNum[0]
-				day2 := daysNum[1]
-
-				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-
-				// Вычисляем дату, которая происходит раньше
-				if allegedNextDate1.Day() >= nextDate.Day() &&
-					allegedNextDate2.Day() > nextDate.Day() {
-					return allegedNextDate2.Format("20060102"), nil
-				} else {
-					return allegedNextDate1.Format("20060102"), nil
-				}
-			}
-		}
-		nextDate = nextDate.AddDate(0, 0, 1)
+		NowBeforeNextDate(now, nextDate, negativeNum, minNumDay, daysNum)
 	}
 	return "", nil
 }
@@ -518,110 +470,11 @@ outerLoop:
 	// Ищем мининимально число в массиве daysNum
 	minNumDay := FindMinNum(daysNum, negativeNum)
 
-	// Текущая(now) дата в прошлом относитительно даты старта(startDate)
+	// Расчет nextDate в функции PreliminaryNextDate, позволяет всегда выполняться условию now.Before(nextDate)
 	for now.Before(nextDate) {
-		for _, day := range daysNum {
-			// ПРоверка даты для положительного числа из массива
-			if day > 0 && day == nextDate.Day() {
-				return nextDate.Format("20060102"), nil
-			}
-
-			if len(daysNum) == 1 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число при этом в массиве одно отрицательное число,
-			// то вычисляем следующую дату задачи
-			if day < 0 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
-					return nextDate.Format("20060102"), nil
-				} else if nextDate.Day() >= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число (при этом в массиве два отрицательных числа),
-			// то вычисляем следующую дату задачи следующим образом
-			if day < 0 && negativeNum == 2 {
-				day1 := daysNum[0]
-				day2 := daysNum[1]
-
-				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-
-				// Вычисляем дату, которая происходит раньше
-				if allegedNextDate1.Day() >= nextDate.Day() &&
-					allegedNextDate2.Day() > nextDate.Day() {
-					return allegedNextDate2.Format("20060102"), nil
-				} else {
-					return allegedNextDate1.Format("20060102"), nil
-				}
-			}
-		}
-		nextDate = nextDate.AddDate(0, 0, 1)
+		NowBeforeNextDate(now, nextDate, negativeNum, minNumDay, daysNum)
 	}
 
-	// Текущая дата(now) в будущем относительно старта(startDate)
-	// Перебираем дни после текущей даты и сравниваем с числом из массива дней
-	for nextDate.After(now) {
-		for _, day := range daysNum {
-			// Если день из массива положительное число и равен дню проверяемой даты, то назначаем выполнение задачи
-			if day > 0 && day == nextDate.Day() {
-				return nextDate.Format("20060102"), nil
-			}
-
-			if len(daysNum) == 1 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число при этом в массиве одно отрицательное число,
-			// то вычисляем следующую дату задачи
-			if day < 0 && negativeNum == 1 {
-				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
-
-				if nextDate.Day() <= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
-					return nextDate.Format("20060102"), nil
-				} else if nextDate.Day() >= minNumDay &&
-					nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
-				}
-			}
-
-			// Если день из массива отрицательное число (при этом в массиве два отрицательных числа),
-			// то вычисляем следующую дату задачи следующим образом
-			if day < 0 && negativeNum == 2 {
-				day1 := daysNum[0]
-				day2 := daysNum[1]
-
-				allegedNextDate1 := CalculatAllegedNextDate(nextDate, day1)
-				allegedNextDate2 := CalculatAllegedNextDate(nextDate, day2)
-
-				// Вычисляем дату, которая происходит раньше
-				if allegedNextDate1.Day() >= nextDate.Day() &&
-					allegedNextDate2.Day() > nextDate.Day() {
-					return allegedNextDate2.Format("20060102"), nil
-				} else {
-					return allegedNextDate1.Format("20060102"), nil
-				}
-			}
-		}
-		nextDate = nextDate.AddDate(0, 0, 1)
-	}
 	return "", nil
 }
 
