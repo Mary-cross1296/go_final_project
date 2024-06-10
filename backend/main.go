@@ -164,6 +164,19 @@ func FindMinNum(nums []int, numNegative int) int {
 	return minNumDay
 }
 
+// Функция поиска предварительной nextDate
+func TentativeNextDate(now time.Time, startDate time.Time) (time.Time, error) {
+	nextDate := startDate
+	if now == startDate || now.After(startDate) { // Now в будущем относительно startDate
+		nextDate = now.AddDate(0, 0, 1)
+		return nextDate, nil
+	} else if now.Before(startDate) { // Now в прошлом относительно startDate
+		nextDate = startDate.AddDate(0, 0, 1)
+		return nextDate, nil
+	}
+	return time.Time{}, fmt.Errorf("TentativeNextDate() could not predetermine the next date")
+}
+
 func CalculatAllegedNextDate(nextDate time.Time, day int) time.Time {
 	// Устанавливаем предполагаемую следующую дату задания на 1 число текущего месяца
 	allegedNextDate := time.Date(nextDate.Year(), nextDate.Month(), 1, 0, 0, 0, 0, nextDate.Location())
@@ -361,19 +374,13 @@ func CalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (str
 
 // Условие: перенос задачи на заданный день месяца
 func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (string, error) {
+	nextDate, _ := TentativeNextDate(now, startDate)
+
 	// Считаем кол-во отрицательных чисел в массиве
 	negativeNum := CountNegativeNumbers(daysNum)
 
 	// Ищем мининимально число в массиве daysNum
 	minNumDay := FindMinNum(daysNum, negativeNum)
-
-	nextDate := startDate                         // Если now находится в прошлом относительно startDate
-	if now == startDate || now.After(startDate) { // Если now равно startDate или если now в будущем относительно starDate
-		nextDate = now.AddDate(0, 0, 1)
-	} else if now.Before(startDate) {
-		nextDate = startDate.AddDate(0, 0, 1)
-	}
-	fmt.Printf("Отладка nextDate %v \n", nextDate)
 
 	// Текущая(now) дата в прошлом относитительно даты старта(startDate)
 	for now.Before(nextDate) {
@@ -484,12 +491,7 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 
 // Условие: перенос задачи на определенное число указанных месяцев
 func CalculatMonthsTask(now time.Time, startDate time.Time, daysNum []int, monthsNum []int) (string, error) {
-	nextDate := startDate                         // Если now находится в прошлом относительно startDate
-	if now == startDate || now.After(startDate) { // Если now равно startDate или если now в будущем относительно starDate
-		nextDate = now.AddDate(0, 0, 1)
-	} else if now.Before(startDate) {
-		nextDate = startDate.AddDate(0, 0, 1)
-	}
+	nextDate, _ := TentativeNextDate(now, startDate)
 
 	// Ищем подходящий месяц
 	monthBool := true
