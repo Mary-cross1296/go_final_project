@@ -165,7 +165,7 @@ func FindMinNum(nums []int, numNegative int) int {
 }
 
 // Функция поиска предварительной nextDate
-func TentativeNextDate(now time.Time, startDate time.Time) (time.Time, error) {
+func PreliminaryNextDate(now time.Time, startDate time.Time) (time.Time, error) {
 	nextDate := startDate
 	if now == startDate || now.After(startDate) { // Now в будущем относительно startDate
 		nextDate = now.AddDate(0, 0, 1)
@@ -374,7 +374,7 @@ func CalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (str
 
 // Условие: перенос задачи на заданный день месяца
 func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (string, error) {
-	nextDate, _ := TentativeNextDate(now, startDate)
+	nextDate, _ := PreliminaryNextDate(now, startDate)
 
 	// Считаем кол-во отрицательных чисел в массиве
 	negativeNum := CountNegativeNumbers(daysNum)
@@ -491,7 +491,7 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 
 // Условие: перенос задачи на определенное число указанных месяцев
 func CalculatMonthsTask(now time.Time, startDate time.Time, daysNum []int, monthsNum []int) (string, error) {
-	nextDate, _ := TentativeNextDate(now, startDate)
+	nextDate, _ := PreliminaryNextDate(now, startDate)
 
 	// Ищем подходящий месяц
 	monthBool := true
