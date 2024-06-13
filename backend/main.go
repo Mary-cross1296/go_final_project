@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -25,6 +26,24 @@ type Scheduler struct {
 	Title   string
 	Comment string
 	Repeat  string
+}
+
+// Task представляет задачу
+type Task struct {
+	Date    string `json:"date"`
+	Title   string `json:"title"`
+	Comment string `json:"comment"`
+	Repeat  string `json:"repeat"`
+}
+
+// ErrorResponse представляет структуру ошибки
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// SuccessResponse представляет успешный ответ с ID
+type SuccessResponse struct {
+	ID int64 `json:"id"`
 }
 
 // Обработчик запросов на /api/nextdate.
@@ -58,8 +77,88 @@ func StaticFileHandler(wd string) {
 	http.Handle("/", staticHandler)
 }
 
+// addTaskHandler обрабатывает POST-запрос на добавление задачи
 func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
+	// Функция для отправки ошибочного ответа
+	errorResponse := func(w http.ResponseWriter, errResp ErrorResponse, statusCode int) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(statusCode)
+		response, _ := json.Marshal(errResp)
+		w.Write(response)
+	}
 
+	// Функция для отправки успешного ответа
+	successResponse := func(w http.ResponseWriter, successResp SuccessResponse) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		response, _ := json.Marshal(successResp)
+		w.Write(response)
+	}
+
+	// Проверяем метод запроса
+	if r.Method != http.MethodPost {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Декодируем JSON-данные запроса в структуру Task
+	var task Task
+	err := json.NewDecoder(r.Body).Decode(&task)
+	if err != nil {
+		errorResponse(w, ErrorResponse{Error: "Ошибка десериализации JSON"}, http.StatusBadRequest)
+		return
+	}
+
+	// Проверяем обязательное поле title
+	if task.Title == "" {
+		errorResponse(w, ErrorResponse{Error: "Не указан заголовок задачи"}, http.StatusBadRequest)
+		return
+	}
+
+	// Если дата не указана
+	if task.Date == "" {
+		task.Date = time.Now().Format("20060102")
+	}
+
+	// Проверяем формат даты
+	_, err = time.Parse("20060102", task.Date)
+	if err != nil {
+		errorResponse(w, ErrorResponse{Error: "Дата представлена в неправильном формате"}, http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now()
+
+	if (task.Date == now.Format("20060102") && task.Repeat == "") || task.Repeat == "" {
+		task.Date = now.Format("20060102")
+		fmt.Printf("Отладка 1 task.Date %v \n", task.Date)
+	} else {
+		nextDate, err := NextDate(now, task.Date, task.Repeat)
+		if err != nil {
+			errorResponse(w, ErrorResponse{Error: "Неправильное правило повторения"}, http.StatusBadRequest)
+			return
+		}
+		task.Date = nextDate
+	}
+
+	// Выполняем запрос INSERT в базу данных
+	tableName := "scheduler.db"
+	db, _ := OpenDataBase(tableName)
+	query := "INSERT INTO scheduler (date, title, comment, repeat) VALUES (?, ?, ?, ?)"
+	res, err := db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
+	if err != nil {
+		errorResponse(w, ErrorResponse{Error: "Ошибка при выполнении запроса"}, http.StatusInternalServerError)
+		return
+	}
+
+	// Получаем ID добавленной задачи
+	id, err := res.LastInsertId()
+	if err != nil {
+		errorResponse(w, ErrorResponse{Error: "Ошибка при получении ID задачи"}, http.StatusInternalServerError)
+		return
+	}
+
+	// Отправляем успешный ответ с ID добавленной задачи
+	successResponse(w, SuccessResponse{ID: id})
 }
 
 func HttpServer(port, wd string) *http.Server {
@@ -192,7 +291,7 @@ func CreateTableWithIndex(db *sql.DB) error {
 	createTableRequest := `
 	CREATE TABLE scheduler (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		date DATE NOT NULL,
+		date VARCHAR(128) NOT NULL,
 		title VARCHAR(128) NOT NULL DEFAULT "",
 		comment VARCHAR(256) NOT NULL DEFAULT "",
 		repeat VARCHAR(128) NOT NULL DEFAULT ""
@@ -224,11 +323,17 @@ func CalculatDailyTask(now time.Time, startDate time.Time, repeat string) (strin
 	}
 
 	if days <= 0 || days > 400 {
-		err = errors.New("Invalid number of days")
+		err = errors.New("invalid number of days")
 		return "", err
 	}
 
-	nextDate := startDate
+	var nextDate time.Time
+	if days == 1 && now.Format("20060102") == startDate.Format("20060102") {
+		nextDate = now
+		return nextDate.Format("20060102"), nil
+	}
+
+	nextDate = startDate
 	// Рассматриваем вариант, когда дата начала(starDate) задачи находится в будущем относительно текущего времени(now)
 	if now.Before(nextDate) || now == nextDate {
 		nextDate = nextDate.AddDate(0, 0, days)
@@ -632,6 +737,8 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		fmt.Printf("The start time cannot be converted to a valid date: %s", err)
 		return "", err
 	}
+	fmt.Printf("NextDate() Отладка date %v \n", date)
+	fmt.Printf("NextDate() Отладка startDate %v \n", startDate)
 
 	switch {
 	case strings.HasPrefix(repeat, "d "):
