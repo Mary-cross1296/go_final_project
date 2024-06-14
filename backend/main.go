@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -282,6 +283,20 @@ func NowBeforeNextDate(now time.Time, nextDate time.Time, negativeNum int, minNu
 		for _, day := range daysNum {
 			// Проверка даты для положительного числа из массива
 			if day > 0 && negativeNum == 0 && day == nextDate.Day() {
+				return nextDate.Format("20060102"), nil
+			}
+
+			if day > 0 && negativeNum == 1 && day == nextDate.Day() {
+				negativeNumMin := slices.Min(daysNum)
+				allegedNextDate := CalculatAllegedNextDate(nextDate, negativeNumMin)
+				if nextDate.Day() <= minNumDay &&
+					nextDate.Day() <= allegedNextDate.Day() {
+					nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
+					return nextDate.Format("20060102"), nil
+				} else if nextDate.Day() >= minNumDay &&
+					nextDate.Day() <= allegedNextDate.Day() {
+					return allegedNextDate.Format("20060102"), nil
+				}
 				return nextDate.Format("20060102"), nil
 			}
 
