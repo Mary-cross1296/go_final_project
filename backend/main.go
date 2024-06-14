@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gorilla/mux"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -163,17 +165,21 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func HttpServer(port, wd string) *http.Server {
-	// Создание объект сервера
-	httpServer := http.Server{
-		Addr: ":" + port, // Установка адреса сервера
-	}
+	// Создание роутера
+	router := mux.NewRouter()
 
 	// Обработчик статических файлов
 	StaticFileHandler(wd)
-	// Обработчики запросов следующей даты
-	http.HandleFunc("/api/nextdate", NextDateHandler)
-	// Обработчик запросов задачи
-	http.HandleFunc("/api/task", AddTaskHandler)
+
+	// Обработчики запросов
+	router.HandleFunc("/api/nextdate", NextDateHandler).Methods("GET") // Обработчики запросов следующей даты
+	router.HandleFunc("/api/task", AddTaskHandler).Methods("POST")     // Обработчик запросов задачи
+
+	// Создание объект сервера
+	httpServer := http.Server{
+		Addr:    ":" + port, // Установка адреса сервера
+		Handler: router,     // Установка роутера в качестве обработчика
+	}
 
 	// Запуск сервера на указанном порту
 	log.Printf("Сервер запущен на порту %v\n", port)
@@ -569,18 +575,18 @@ func CalculatMonthsTask(now time.Time, startDate time.Time, daysNum []int, month
 	nextDate, _ := PreliminaryNextDate(now, startDate)
 
 	// Ищем подходящий месяц
-	monthBool := true
+	isLoop := true
 	counter := 0
 
-outerLoop:
-	for monthBool {
+searchingMonths:
+	for isLoop {
 		for _, month := range monthsNum {
 			if month == int(nextDate.Month()) && counter < 1 {
-				fmt.Printf("Отладка nextDate %v \n", nextDate)
-				break outerLoop
+				isLoop = false
+				break searchingMonths
 			} else if month == int(nextDate.Month()) {
 				nextDate = time.Date(nextDate.Year(), nextDate.Month(), 1, 0, 0, 0, 0, nextDate.Location())
-				break outerLoop
+				break searchingMonths
 			}
 		}
 		nextDate = nextDate.AddDate(0, 1, 0)
