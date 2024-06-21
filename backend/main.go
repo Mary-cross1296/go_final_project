@@ -18,8 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	_ "modernc.org/sqlite"
 )
 
@@ -33,7 +31,8 @@ type Scheduler struct {
 
 // Task представляет задачу
 type Task struct {
-	ID      int64  `json:"id"`
+	//ID      int64  `json:"id"`
+	ID      string `json:"id"`
 	Date    string `json:"date"`
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
@@ -61,6 +60,7 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Вызываем функцию NextDate для получения следующей даты
 	nextDate, err := NextDate(now, date, repeat)
+	fmt.Printf("Отладка следующая дата %v \n", nextDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -71,9 +71,9 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(nextDate))
 }
 
-func StaticFileHandler(wd string) {
-	staticHandler := http.FileServer(http.Dir(wd))
-	http.Handle("/", staticHandler)
+func StaticFileHandler(wd string, mux *http.ServeMux) {
+	staticHandler := http.StripPrefix("/", http.FileServer(http.Dir(wd)))
+	mux.Handle("/", staticHandler)
 }
 
 // Функция для отправки ошибочного ответа
@@ -113,7 +113,7 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Проверяем формат даты
-	_, err = time.Parse("20060102", task.Date)
+	date, err := time.Parse("20060102", task.Date)
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "Дата представлена в неправильном формате"}, http.StatusBadRequest)
 		return
@@ -121,22 +121,37 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 
-	if (task.Date == now.Format("20060102") && task.Repeat == "") || task.Repeat == "" {
-		task.Date = now.Format("20060102")
-		//fmt.Printf("Отладка 1 task.Date %v \n", task.Date)
-	} else {
-		nextDate, err := NextDate(now, task.Date, task.Repeat)
-		if err != nil {
-			SendErrorResponse(w, ErrorResponse{Error: "Неправильное правило повторения"}, http.StatusBadRequest)
-			return
+	if date.Before(now) {
+		if task.Repeat == "" {
+			task.Date = time.Now().Format("20060102")
+		} else {
+			dateStr := date.Format("20060102")
+			nextDate, err := NextDate(now, dateStr, task.Repeat)
+			if err != nil {
+				http.Error(w, `{"error":"Неправильное правило повторения"}`, http.StatusBadRequest)
+				return
+			}
+			task.Date = nextDate
 		}
-		task.Date = nextDate
 	}
+
+	// if (task.Date == now.Format("20060102") && task.Repeat == "") || task.Repeat == "" {
+	// 	task.Date = now.Format("20060102")
+	// 	//fmt.Printf("Отладка 1 task.Date %v \n", task.Date)
+	// } else {
+	// 	nextDate, err := NextDate(now, task.Date, task.Repeat)
+	// 	if err != nil {
+	// 		SendErrorResponse(w, ErrorResponse{Error: "Неправильное правило повторения"}, http.StatusBadRequest)
+	// 		return
+	// 	}
+	// 	task.Date = nextDate
+	// }
 
 	// Выполняем запрос INSERT в базу данных
 	tableName := "scheduler.db"
 	db, _ := OpenDataBase(tableName)
 	query := "INSERT INTO scheduler (date, title, comment, repeat) VALUES (?, ?, ?, ?)"
+
 	res, err := db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "Ошибка при выполнении запроса"}, http.StatusInternalServerError)
@@ -150,53 +165,107 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Устанавливаем полученный id ранее добавленной задаче
-	task.ID = id
+	// Устанавливаем полученный id в качестве строки
+	task.ID = fmt.Sprint(id)
 
+	// Устанавливаем полученный id ранее добавленной задаче
+	//task.ID = string(id)
 	// Отправляем успешный ответ с ID добавленной задачи
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	response, _ := json.Marshal(task)
-	w.Write(response)
+	//w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	//response, _ := json.Marshal(task)
+	//w.Write(response)
+
+	response := map[string]interface{}{"id": id}
+	responseId, err := json.Marshal(response)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "Ошибка кодирования JSON: %s"}, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseId)
 }
 
-func GetListUpcomingTaskaHandler(w http.ResponseWriter, r *http.Request) {
+func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса
-	fmt.Printf("GetListUpcomingTaskaHandler - метод: %v\n", r.Method)
+	fmt.Printf("GetListUpcomingTasksHandler - метод: %v\n", r.Method)
 	if r.Method != http.MethodGet {
 		SendErrorResponse(w, ErrorResponse{Error: "Method not supported"}, http.StatusMethodNotAllowed)
 		return
 	}
-	//search := r.FormValue("search")
-
-	tableName := "scheduler.db"
-	db, _ := OpenDataBase(tableName)
-
-	// Запрашиваем задачи из базы данных, отсортированные по дате
-	rows, err := db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date")
-	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Error executing database query"}, http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
 
 	var tasks []Task
 	var task Task
+	var rows *sql.Rows
+	var err error
+
+	tableName := "scheduler.db"
+	db, _ := OpenDataBase(tableName)
+	defer db.Close()
+
+	search := r.FormValue("search")
+	// Проверяем, что параметр поиска не пустой
+	if search != "" {
+		var searchDate time.Time
+		// Попробуем распознать дату в формате "ггггммдд"
+		searchDate, err = time.Parse("20060102", search)
+		fmt.Printf("Отладка searchDate 1 %v \n", searchDate)
+		if err != nil || searchDate.Year() == 1 {
+			// Если не получилось, попробуем распознать дату в формате "дд.мм.гггг"
+			searchDate, err = time.Parse("02.01.2006", search)
+			fmt.Printf("Отладка searchDate 2 %v \n", searchDate)
+		}
+
+		if err == nil {
+			// Если удалось распознать дату, делаем запрос по дате
+			searchDateStr := searchDate.Format("20060102")
+			fmt.Printf("Отладка searchDateStr 3 %v \n", searchDateStr)
+			rows, err = db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE date = ? ORDER BY date DESC LIMIT 50", searchDateStr)
+			if err != nil {
+				SendErrorResponse(w, ErrorResponse{Error: "Error executing database query"}, http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+		} else {
+			// Если дата не распознана, делаем запрос по подстроке в title или comment
+			fmt.Printf("Отладка в поиске не дата %v \n", search)
+			rows, err = db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE title LIKE ? OR comment LIKE ? ORDER BY date DESC LIMIT 50", "%"+search+"%", "%"+search+"%")
+			if err != nil {
+				SendErrorResponse(w, ErrorResponse{Error: "Error executing database query"}, http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+		}
+	} else {
+		// Делаем запрос по поиску всех задач с сортировкой по дате
+		rows, err = db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date DESC LIMIT 50")
+		if err != nil {
+			SendErrorResponse(w, ErrorResponse{Error: "Error executing database query"}, http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+	}
+
 	for rows.Next() {
-		if err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat); err != nil {
+		var id int64
+		if err := rows.Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat); err != nil {
 			SendErrorResponse(w, ErrorResponse{Error: "Error scanning information received from the database"}, http.StatusInternalServerError)
 			return
 		}
+		task.ID = fmt.Sprint(id)
 		tasks = append(tasks, task)
 	}
+	//fmt.Printf("Отладка tasks %v \n", tasks)
 
 	// Если список задач пустой, возвращаем пустой массив
 	if len(tasks) == 0 {
-		tasks = []Task{}
+		tasks = []Task{} // или просто nil, но не пустой массив
 	}
 
-	// Формируем ответ в формате JSON
-	response, err := json.Marshal(tasks)
-	fmt.Printf("GetListUpcomingTaskaHandler - response: %v\n", response)
+	// Формируем ответ в формате JSON объекта с ключом "tasks"
+	responseMap := map[string][]Task{"tasks": tasks}
+	response, err := json.Marshal(responseMap)
+	//fmt.Printf("GetListUpcomingTasksHandler - response: %v\n", string(response))
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "Ошибка формирования JSON"}, http.StatusInternalServerError)
 		return
@@ -204,26 +273,25 @@ func GetListUpcomingTaskaHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Printf("GetListUpcomingTaskaHandler - response: %v\n", string(response))
 	w.Write(response)
 }
 
 func HttpServer(port, wd string) *http.Server {
 	// Создание роутера
-	router := mux.NewRouter()
+	mux := http.NewServeMux()
 
 	// Обработчик статических файлов
-	StaticFileHandler(wd)
+	StaticFileHandler(wd, mux)
 
 	// Обработчики запросов
-	router.HandleFunc("/api/nextdate", NextDateHandler).Methods("GET")          // Обработчики запросов следующей даты
-	router.HandleFunc("/api/task", AddTaskHandler).Methods("POST")              // Обработчик запросов задачи
-	router.HandleFunc("/api/tasks", GetListUpcomingTaskaHandler).Methods("GET") // Обработчик запросов получения списка ближайших задач
+	mux.HandleFunc("/api/nextdate", NextDateHandler)          // Обработчики запросов следующей даты
+	mux.HandleFunc("/api/task", AddTaskHandler)               // Обработчик запросов задачи
+	mux.HandleFunc("/api/tasks", GetListUpcomingTasksHandler) // Обработчик запросов получения списка ближайших задач
 
 	// Создание объект сервера
 	httpServer := http.Server{
 		Addr:    ":" + port, // Установка адреса сервера
-		Handler: router,     // Установка роутера в качестве обработчика
+		Handler: mux,        // Установка роутера в качестве обработчика
 	}
 
 	// Запуск сервера на указанном порту
