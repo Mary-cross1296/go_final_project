@@ -276,6 +276,14 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
+func EditTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		SendErrorResponse(w, ErrorResponse{Error: "Method not supported"}, http.StatusBadRequest)
+		return
+	}
+
+}
+
 func HttpServer(port, wd string) *http.Server {
 	// Создание роутера
 	mux := http.NewServeMux()
@@ -284,9 +292,10 @@ func HttpServer(port, wd string) *http.Server {
 	StaticFileHandler(wd, mux)
 
 	// Обработчики запросов
-	mux.HandleFunc("/api/nextdate", NextDateHandler)          // Обработчики запросов следующей даты
-	mux.HandleFunc("/api/task", AddTaskHandler)               // Обработчик запросов задачи
-	mux.HandleFunc("/api/tasks", GetListUpcomingTasksHandler) // Обработчик запросов получения списка ближайших задач
+	mux.HandleFunc("/api/nextdate", NextDateHandler)          // Обработчики GET запросов следующей даты
+	mux.HandleFunc("/api/task", AddTaskHandler)               // Обработчик POST запросов задачи
+	mux.HandleFunc("/api/tasks", GetListUpcomingTasksHandler) // Обработчик GET запросов получения списка ближайших задач
+	mux.HandleFunc("/api/task", EditTask)                     // Обработчик GET запросов на редактирование задачи
 
 	// Создание объект сервера
 	httpServer := http.Server{
