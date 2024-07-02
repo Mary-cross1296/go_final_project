@@ -279,7 +279,7 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-func EditTask(w http.ResponseWriter, r *http.Request) {
+func GetTaskForEdit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		SendErrorResponse(w, ErrorResponse{Error: "Method not supported"}, http.StatusBadRequest)
 		return
@@ -296,19 +296,18 @@ func EditTask(w http.ResponseWriter, r *http.Request) {
 	db, _ := OpenDataBase(tableName)
 	defer db.Close()
 
-	rows, err := db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParam)
-	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Задача не найдена"}, http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
 	var task Task
 	var id int64
-	if err := rows.Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat); err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Error scanning information received from the database"}, http.StatusInternalServerError)
+
+	err := db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParam).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	if err == sql.ErrNoRows {
+		SendErrorResponse(w, ErrorResponse{Error: "Задача не найдена"}, http.StatusNotFound)
+		return
+	} else if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "Ошибка получения данных задачи"}, http.StatusInternalServerError)
 		return
 	}
+
 	task.ID = fmt.Sprint(id)
 	// for rows.Next() {
 	// 	var id int64
@@ -442,9 +441,9 @@ func HttpServer(port, wd string) *http.Server {
 	// Обработчики запросов
 	router.HandleFunc("/api/nextdate", NextDateHandler).Methods(http.MethodGet)
 	router.HandleFunc("/api/task", AddTaskHandler).Methods(http.MethodPost)
-	router.HandleFunc("/api/task", EditTask).Methods(http.MethodGet)
-	router.HandleFunc("/api/tasks", GetListUpcomingTasksHandler).Methods(http.MethodGet)
+	router.HandleFunc("/api/task", GetTaskForEdit).Methods(http.MethodGet)
 	router.HandleFunc("/api/task", SaveEditTask).Methods(http.MethodPut)
+	router.HandleFunc("/api/tasks", GetListUpcomingTasksHandler).Methods(http.MethodGet)
 
 	// Обработчик статических файлов
 	StaticFileHandler(wd, router)
