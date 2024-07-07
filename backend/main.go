@@ -333,7 +333,7 @@ func GetTaskForEdit(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-func SaveEditTask(w http.ResponseWriter, r *http.Request) {
+func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса
 	fmt.Printf("AddTaskHandler - метод: %v\n", r.Method)
 	if r.Method != http.MethodPut {
@@ -422,6 +422,151 @@ func SaveEditTask(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
+func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): method not supported"}, http.StatusBadRequest)
+		return
+	}
+
+	idParam := r.FormValue("id")
+	if idParam == "" {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task ID not specified"}, http.StatusBadRequest)
+		return
+	}
+	fmt.Printf("Отладка 01 idParam %v \n", idParam)
+
+	tableName := "scheduler.db"
+	db, _ := OpenDataBase(tableName)
+	defer db.Close()
+
+	var task Task
+	var id int64
+	idParamNum, _ := strconv.Atoi(idParam)
+	err := db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParamNum).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	task.ID = fmt.Sprint(id)
+	fmt.Printf("Отладка 001 task %v \n", task)
+	if err == sql.ErrNoRows {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusNotFound)
+		return
+	} else if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Error retrieving task data"}, http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now()
+	if task.Repeat != "" {
+		fmt.Printf("Отладка 0 id %v \n", task.ID)
+		fmt.Printf("Отладка 1 now %v \n", now)
+		fmt.Printf("Отладка 2 task.Date before %v \n", task.Date)
+
+		newTaskDate, err := NextDate(now, task.Date, task.Repeat)
+		fmt.Printf("Отладка 3 newTaskDate after %v \n ", newTaskDate)
+		if err != nil {
+			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Incorrect task repetition condition"}, http.StatusBadRequest)
+			return
+		}
+
+		task.Date = newTaskDate
+		fmt.Printf("Отладка 4 task.Date before %v \n", task.Date)
+		fmt.Printf("Отладка 4.1 before %v \n", task)
+
+		// Выполняем запрос UPDATE в базу данных
+		query := "UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat =? WHERE id = ?"
+		_, err = db.Exec(query, task.Date, &task.Title, &task.Comment, &task.Repeat, &task.ID)
+		if err != nil {
+			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Printf("Отладка 5 task.Date after %v \n \n", task.Date)
+		fmt.Printf("Отладка 5.1 task after %+v \n \n", task)
+	} else {
+		query := "DELETE FROM scheduler WHERE id = ?"
+		task.ID = fmt.Sprint(id)
+		result, err := db.Exec(query, task.ID)
+		if err != nil {
+			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Error deleting task"}, http.StatusInternalServerError)
+			return
+		}
+
+		//err = db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParamNum).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		//if err != nil {
+		//	fmt.Printf("Задача удалилась %v \n", err)
+		//}
+		//fmt.Printf("Отладка 6 delete %v \n", task)
+
+		// Проверка количества затронутых строк
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Unable to determine the number of rows affected after deleting a task"}, http.StatusInternalServerError)
+			return
+		} else if rowsAffected == 0 {
+			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusInternalServerError)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{}`))
+}
+
+func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): method not supported"}, http.StatusBadRequest)
+		return
+	}
+
+	idParam := r.FormValue("id")
+	if idParam == "" {
+		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Task ID not specified"}, http.StatusBadRequest)
+		return
+	}
+
+	idParamNum, err := strconv.Atoi(idParam)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Error converting idParam to number"}, http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("Отладка Delete idParamNum %v \n", idParamNum)
+
+	tableName := "scheduler.db"
+	db, _ := OpenDataBase(tableName)
+	defer db.Close()
+
+	query := "DELETE FROM scheduler WHERE id = ?"
+	result, err := db.Exec(query, idParamNum)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Error deleting task"}, http.StatusInternalServerError)
+		return
+	}
+
+	// Проверка количества затронутых строк
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Unable to determine the number of rows affected after deleting a task"}, http.StatusInternalServerError)
+		return
+	} else if rowsAffected == 0 {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusInternalServerError)
+		return
+	}
+
+	// Формируем ответ в формате JSON объекта с ключом "tasks"
+	emptyJson := struct{}{}
+	response, err := json.Marshal(emptyJson)
+	//fmt.Printf("GetListUpcomingTasksHandler - response: %v\n", string(response))
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "Ошибка формирования JSON"}, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	responseStr := fmt.Sprintf(string(response))
+	fmt.Printf("Отладка %v", responseStr)
+	w.Write(response)
+}
+
 func HttpServer(port, wd string) *http.Server {
 	// Создание роутера
 	//mux := http.NewServeMux()
@@ -442,7 +587,9 @@ func HttpServer(port, wd string) *http.Server {
 	router.HandleFunc("/api/nextdate", NextDateHandler).Methods(http.MethodGet)
 	router.HandleFunc("/api/task", AddTaskHandler).Methods(http.MethodPost)
 	router.HandleFunc("/api/task", GetTaskForEdit).Methods(http.MethodGet)
-	router.HandleFunc("/api/task", SaveEditTask).Methods(http.MethodPut)
+	router.HandleFunc("/api/task", SaveEditTaskHandler).Methods(http.MethodPut)
+	router.HandleFunc("/api/task/done", DoneTaskHandler).Methods(http.MethodPost)
+	router.HandleFunc("/api/task", DeleteTaskHandler).Methods(http.MethodDelete)
 	router.HandleFunc("/api/tasks", GetListUpcomingTasksHandler).Methods(http.MethodGet)
 
 	// Обработчик статических файлов
