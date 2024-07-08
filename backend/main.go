@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -18,7 +19,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 )
 
@@ -43,6 +46,22 @@ type Task struct {
 // ErrorResponse представляет структуру ошибки
 type ErrorResponse struct {
 	Error string `json:"error"`
+}
+
+type Password struct {
+	Password string `json:"password"`
+}
+
+var jwtKey = []byte("final_progect_go") // секретный ключ для подписи JWT
+
+type Token struct {
+	Token string `json:"token"`
+}
+
+// Claims - структура для хранения данных токена
+type Claims struct {
+	jwt.StandardClaims
+	PasswordHash string `json:"password_hash"`
 }
 
 // Обработчик запросов на /api/nextdate.
@@ -423,7 +442,7 @@ func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+	if r.Method != http.MethodPost {
 		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): method not supported"}, http.StatusBadRequest)
 		return
 	}
@@ -433,7 +452,8 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task ID not specified"}, http.StatusBadRequest)
 		return
 	}
-	fmt.Printf("Отладка 01 idParam %v \n", idParam)
+	fmt.Printf("Отладка 0 idParam %v \n", idParam)
+	idParamNum, _ := strconv.Atoi(idParam)
 
 	tableName := "scheduler.db"
 	db, _ := OpenDataBase(tableName)
@@ -441,10 +461,9 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	var task Task
 	var id int64
-	idParamNum, _ := strconv.Atoi(idParam)
 	err := db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParamNum).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 	task.ID = fmt.Sprint(id)
-	fmt.Printf("Отладка 001 task %v \n", task)
+	fmt.Printf("Отладка 1 task %v \n", task)
 	if err == sql.ErrNoRows {
 		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusNotFound)
 		return
@@ -455,20 +474,14 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	if task.Repeat != "" {
-		fmt.Printf("Отладка 0 id %v \n", task.ID)
-		fmt.Printf("Отладка 1 now %v \n", now)
-		fmt.Printf("Отладка 2 task.Date before %v \n", task.Date)
-
+		// Определяем следующую дату задачи
 		newTaskDate, err := NextDate(now, task.Date, task.Repeat)
-		fmt.Printf("Отладка 3 newTaskDate after %v \n ", newTaskDate)
 		if err != nil {
 			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Incorrect task repetition condition"}, http.StatusBadRequest)
 			return
 		}
-
+		// Изменяем датузадачи на новую
 		task.Date = newTaskDate
-		fmt.Printf("Отладка 4 task.Date before %v \n", task.Date)
-		fmt.Printf("Отладка 4.1 before %v \n", task)
 
 		// Выполняем запрос UPDATE в базу данных
 		query := "UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat =? WHERE id = ?"
@@ -477,9 +490,6 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusInternalServerError)
 			return
 		}
-
-		fmt.Printf("Отладка 5 task.Date after %v \n \n", task.Date)
-		fmt.Printf("Отладка 5.1 task after %+v \n \n", task)
 	} else {
 		query := "DELETE FROM scheduler WHERE id = ?"
 		task.ID = fmt.Sprint(id)
@@ -488,12 +498,6 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Error deleting task"}, http.StatusInternalServerError)
 			return
 		}
-
-		//err = db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParamNum).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-		//if err != nil {
-		//	fmt.Printf("Задача удалилась %v \n", err)
-		//}
-		//fmt.Printf("Отладка 6 delete %v \n", task)
 
 		// Проверка количества затронутых строк
 		rowsAffected, err := result.RowsAffected()
@@ -537,34 +541,131 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	query := "DELETE FROM scheduler WHERE id = ?"
 	result, err := db.Exec(query, idParamNum)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Error deleting task"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Error deleting task"}, http.StatusInternalServerError)
 		return
 	}
 
 	// Проверка количества затронутых строк
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Unable to determine the number of rows affected after deleting a task"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Unable to determine the number of rows affected after deleting a task"}, http.StatusInternalServerError)
 		return
 	} else if rowsAffected == 0 {
-		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusInternalServerError)
-		return
-	}
-
-	// Формируем ответ в формате JSON объекта с ключом "tasks"
-	emptyJson := struct{}{}
-	response, err := json.Marshal(emptyJson)
-	//fmt.Printf("GetListUpcomingTasksHandler - response: %v\n", string(response))
-	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка формирования JSON"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Task not found"}, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	responseStr := fmt.Sprintf(string(response))
-	fmt.Printf("Отладка %v", responseStr)
+	w.Write([]byte(`{}`))
+}
+
+func UserAuthorizationHandler(w http.ResponseWriter, r *http.Request) {
+	// Чтение тела запроса
+	fmt.Printf("Отладка TODO_PASSWORD: %s\n", os.Getenv("TODO_PASSWORD"))
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "UserAuthorizationHandler(): Error reading request body"}, http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	var password Password
+	err = json.Unmarshal(body, &password)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "UserAuthorizationHandler(): JSON deserialization error"}, http.StatusBadRequest)
+		return
+	}
+
+	// Хеширование пароля введенного пользователем
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password.Password), bcrypt.DefaultCost)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "UserAuthorizationHandler(): Error hashing password"}, http.StatusInternalServerError)
+		return
+	}
+
+	// Создание JWT токена с хешем пароля
+	expirationTime := time.Now().Add(8 * time.Hour)
+	claims := &jwt.StandardClaims{
+		ExpiresAt: expirationTime.Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, struct {
+		PasswordHash string `json:"password_hash"`
+		*jwt.StandardClaims
+	}{
+		string(hashedPassword),
+		claims,
+	})
+
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "UserAuthorizationHandler(): Token signing error"}, http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "token",
+		Value:   tokenString,
+		Expires: expirationTime,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	tokenResponse := Token{Token: tokenString}
+	response, _ := json.Marshal(tokenResponse)
 	w.Write(response)
+}
+
+// Функция сравнения паролей
+func comparePasswords(currentPassword string, tokenPasswordHash string) bool {
+	// Сравнение текущего пароля с хэшем пароля из токена
+	err := bcrypt.CompareHashAndPassword([]byte(tokenPasswordHash), []byte(currentPassword))
+	return err == nil
+}
+
+func auth(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pass := os.Getenv("TODO_PASSWORD")
+		fmt.Printf("Отладка pass %v\n", pass)
+		if len(pass) == 0 {
+			// Если пароль не определен, возвращаем ошибку авторизации
+			http.Error(w, "Authorization required", http.StatusUnauthorized)
+			return
+		}
+
+		cookie, err := r.Cookie("token")
+		if err != nil {
+			http.Error(w, "Authorization required", http.StatusUnauthorized)
+			return
+		}
+
+		tokenStr := cookie.Value
+		fmt.Printf("Отладка tokenStr: %v\n", tokenStr)
+		claims := &struct {
+			PasswordHash string `json:"password_hash"`
+			*jwt.StandardClaims
+		}{}
+
+		// Попытка расшифровать и проверить токен
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+			// Возвращаем секретный ключ для проверки подписи токена
+			return jwtKey, nil
+		})
+
+		if err != nil || !token.Valid {
+			http.Error(w, "Authorization required", http.StatusUnauthorized)
+			return
+		}
+
+		// Дополнительная проверка на соответствие текущего пароля и пароля из токена
+		if !comparePasswords(pass, claims.PasswordHash) {
+			http.Error(w, "Authorization required", http.StatusUnauthorized)
+			return
+		}
+
+		// Если все проверки прошли успешно, передаем запрос следующему обработчику
+		next(w, r)
+	})
 }
 
 func HttpServer(port, wd string) *http.Server {
@@ -585,12 +686,13 @@ func HttpServer(port, wd string) *http.Server {
 
 	// Обработчики запросов
 	router.HandleFunc("/api/nextdate", NextDateHandler).Methods(http.MethodGet)
-	router.HandleFunc("/api/task", AddTaskHandler).Methods(http.MethodPost)
-	router.HandleFunc("/api/task", GetTaskForEdit).Methods(http.MethodGet)
-	router.HandleFunc("/api/task", SaveEditTaskHandler).Methods(http.MethodPut)
-	router.HandleFunc("/api/task/done", DoneTaskHandler).Methods(http.MethodPost)
-	router.HandleFunc("/api/task", DeleteTaskHandler).Methods(http.MethodDelete)
-	router.HandleFunc("/api/tasks", GetListUpcomingTasksHandler).Methods(http.MethodGet)
+	router.HandleFunc("/api/task", auth(AddTaskHandler)).Methods(http.MethodPost)
+	router.HandleFunc("/api/task", auth(GetTaskForEdit)).Methods(http.MethodGet)
+	router.HandleFunc("/api/task", auth(SaveEditTaskHandler)).Methods(http.MethodPut)
+	router.HandleFunc("/api/task/done", auth(DoneTaskHandler)).Methods(http.MethodPost)
+	router.HandleFunc("/api/task", auth(DeleteTaskHandler)).Methods(http.MethodDelete)
+	router.HandleFunc("/api/tasks", auth(GetListUpcomingTasksHandler)).Methods(http.MethodGet)
+	router.HandleFunc("/api/signin", UserAuthorizationHandler).Methods(http.MethodPost)
 
 	// Обработчик статических файлов
 	StaticFileHandler(wd, router)
