@@ -74,15 +74,14 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	// Преобразуем параметр "now" в формат time.Time
 	now, err := time.Parse("20060102", nowTime)
 	if err != nil {
-		http.Error(w, "Invalid 'now' parameter format. Use YYYYMMDD", http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "NextDateHandler(): Invalid 'now' parameter format. Use YYYYMMDD"}, http.StatusBadRequest)
 		return
 	}
 
 	// Вызываем функцию NextDate для получения следующей даты
 	nextDate, err := NextDate(now, date, repeat)
-	fmt.Printf("Отладка следующая дата %v \n", nextDate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -91,9 +90,8 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(nextDate))
 }
 
+// Обработчик статичных файлов
 func StaticFileHandler(wd string, router *mux.Router) {
-	//staticHandler := http.StripPrefix("/", http.FileServer(http.Dir(wd)))
-	//mux.Handle("/", staticHandler)
 	fs := http.FileServer(http.Dir(wd))
 	router.PathPrefix("/").Handler(http.StripPrefix("/", fs))
 }
@@ -106,12 +104,11 @@ func SendErrorResponse(w http.ResponseWriter, errResp ErrorResponse, statusCode 
 	w.Write(response)
 }
 
-// addTaskHandler обрабатывает POST-запрос на добавление задачи
+// Обрабатчик POST-запросов на добавление задачи
 func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса
-	fmt.Printf("AddTaskHandler - метод: %v\n", r.Method)
 	if r.Method != http.MethodPost {
-		SendErrorResponse(w, ErrorResponse{Error: "Метод не поддерживается"}, http.StatusMethodNotAllowed)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Method not supported"}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -119,13 +116,13 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	var task Task
 	err := json.NewDecoder(r.Body).Decode(&task)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка десериализации JSON"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): JSON deserialization error"}, http.StatusBadRequest)
 		return
 	}
 
 	// Проверяем обязательное поле title
 	if task.Title == "" {
-		SendErrorResponse(w, ErrorResponse{Error: "Не указан заголовок задачи"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Task title not specified"}, http.StatusBadRequest)
 		return
 	}
 
@@ -137,12 +134,11 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем формат даты
 	date, err := time.Parse("20060102", task.Date)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Дата представлена в неправильном формате"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Date is not in the correct format"}, http.StatusBadRequest)
 		return
 	}
 
 	now := time.Now()
-
 	if date.Before(now) {
 		if task.Repeat == "" {
 			task.Date = time.Now().Format("20060102")
@@ -150,24 +146,12 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 			dateStr := date.Format("20060102")
 			nextDate, err := NextDate(now, dateStr, task.Repeat)
 			if err != nil {
-				http.Error(w, `{"error":"Неправильное правило повторения"}`, http.StatusBadRequest)
+				SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Wrong repetition rule"}, http.StatusBadRequest)
 				return
 			}
 			task.Date = nextDate
 		}
 	}
-
-	// if (task.Date == now.Format("20060102") && task.Repeat == "") || task.Repeat == "" {
-	// 	task.Date = now.Format("20060102")
-	// 	//fmt.Printf("Отладка 1 task.Date %v \n", task.Date)
-	// } else {
-	// 	nextDate, err := NextDate(now, task.Date, task.Repeat)
-	// 	if err != nil {
-	// 		SendErrorResponse(w, ErrorResponse{Error: "Неправильное правило повторения"}, http.StatusBadRequest)
-	// 		return
-	// 	}
-	// 	task.Date = nextDate
-	// }
 
 	// Выполняем запрос INSERT в базу данных
 	tableName := "scheduler.db"
@@ -176,31 +160,24 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка при выполнении запроса"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Error executing request"}, http.StatusInternalServerError)
 		return
 	}
 
 	// Получаем ID добавленной задачи
 	id, err := res.LastInsertId()
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка при получении ID задачи"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Error getting task ID"}, http.StatusInternalServerError)
 		return
 	}
 
 	// Устанавливаем полученный id в качестве строки
 	task.ID = fmt.Sprint(id)
 
-	// Устанавливаем полученный id ранее добавленной задаче
-	//task.ID = string(id)
-	// Отправляем успешный ответ с ID добавленной задачи
-	//w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	//response, _ := json.Marshal(task)
-	//w.Write(response)
-
 	response := map[string]interface{}{"id": id}
 	responseId, err := json.Marshal(response)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка кодирования JSON: %s"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): JSON encoding error"}, http.StatusInternalServerError)
 		return
 	}
 
@@ -208,11 +185,11 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(responseId)
 }
 
+// Обрабатчик Get-запросов на получение списка ближайших задач
 func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса
-	fmt.Printf("GetListUpcomingTasksHandler - метод: %v\n", r.Method)
 	if r.Method != http.MethodGet {
-		SendErrorResponse(w, ErrorResponse{Error: "Method not supported"}, http.StatusMethodNotAllowed)
+		SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Method not supported"}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -231,29 +208,25 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 		var searchDate time.Time
 		// Попробуем распознать дату в формате "ггггммдд"
 		searchDate, err = time.Parse("20060102", search)
-		fmt.Printf("Отладка searchDate 1 %v \n", searchDate)
 		if err != nil || searchDate.Year() == 1 {
 			// Если не получилось, попробуем распознать дату в формате "дд.мм.гггг"
 			searchDate, err = time.Parse("02.01.2006", search)
-			fmt.Printf("Отладка searchDate 2 %v \n", searchDate)
 		}
 
 		if err == nil {
 			// Если удалось распознать дату, делаем запрос по дате
 			searchDateStr := searchDate.Format("20060102")
-			fmt.Printf("Отладка searchDateStr 3 %v \n", searchDateStr)
 			rows, err = db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE date = ? ORDER BY date DESC LIMIT 50", searchDateStr)
 			if err != nil {
-				SendErrorResponse(w, ErrorResponse{Error: "Error executing database query"}, http.StatusInternalServerError)
+				SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error executing database query"}, http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
 		} else {
 			// Если дата не распознана, делаем запрос по подстроке в title или comment
-			fmt.Printf("Отладка в поиске не дата %v \n", search)
 			rows, err = db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE title LIKE ? OR comment LIKE ? ORDER BY date DESC LIMIT 50", "%"+search+"%", "%"+search+"%")
 			if err != nil {
-				SendErrorResponse(w, ErrorResponse{Error: "Error executing database query"}, http.StatusInternalServerError)
+				SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error executing database query"}, http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
@@ -262,7 +235,7 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 		// Делаем запрос по поиску всех задач с сортировкой по дате
 		rows, err = db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date DESC LIMIT 50")
 		if err != nil {
-			SendErrorResponse(w, ErrorResponse{Error: "Error executing database query"}, http.StatusInternalServerError)
+			SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error executing database query"}, http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -271,13 +244,12 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat); err != nil {
-			SendErrorResponse(w, ErrorResponse{Error: "Error scanning information received from the database"}, http.StatusInternalServerError)
+			SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler():  Error scanning information received from the database"}, http.StatusInternalServerError)
 			return
 		}
 		task.ID = fmt.Sprint(id)
 		tasks = append(tasks, task)
 	}
-	//fmt.Printf("Отладка tasks %v \n", tasks)
 
 	// Если список задач пустой, возвращаем пустой массив
 	if len(tasks) == 0 {
@@ -289,7 +261,7 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	response, err := json.Marshal(responseMap)
 	//fmt.Printf("GetListUpcomingTasksHandler - response: %v\n", string(response))
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка формирования JSON"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): JSON generation error"}, http.StatusInternalServerError)
 		return
 	}
 
@@ -298,16 +270,17 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
+// Обработчик Get-запросов на получение задачи по id для редактирования
 func GetTaskForEdit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		SendErrorResponse(w, ErrorResponse{Error: "Method not supported"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): Method not supported"}, http.StatusBadRequest)
 		return
 	}
 
 	idParam := r.FormValue("id")
 
 	if idParam == "" {
-		SendErrorResponse(w, ErrorResponse{Error: "Не указан идентификатор"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): ID not specified"}, http.StatusBadRequest)
 		return
 	}
 
@@ -320,28 +293,19 @@ func GetTaskForEdit(w http.ResponseWriter, r *http.Request) {
 
 	err := db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParam).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 	if err == sql.ErrNoRows {
-		SendErrorResponse(w, ErrorResponse{Error: "Задача не найдена"}, http.StatusNotFound)
+		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): Task not found"}, http.StatusNotFound)
 		return
 	} else if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка получения данных задачи"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): Error retrieving task data"}, http.StatusInternalServerError)
 		return
 	}
 
 	task.ID = fmt.Sprint(id)
-	// for rows.Next() {
-	// 	var id int64
-	// 	if err := rows.Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat); err != nil {
-	// 		SendErrorResponse(w, ErrorResponse{Error: "Error scanning information received from the database"}, http.StatusInternalServerError)
-	// 		return
-	// 	}
-	// 	task.ID = fmt.Sprint(id)
-	// }
 
 	// Формируем ответ в формате JSON объекта с ключом "tasks"
 	response, err := json.Marshal(task)
-	//fmt.Printf("GetListUpcomingTasksHandler - response: %v\n", string(response))
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка формирования JSON"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): JSON generation error"}, http.StatusInternalServerError)
 		return
 	}
 
@@ -352,11 +316,11 @@ func GetTaskForEdit(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
+// Обработчик Put-запросов на сохранение изменений задачи
 func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса
-	fmt.Printf("AddTaskHandler - метод: %v\n", r.Method)
 	if r.Method != http.MethodPut {
-		SendErrorResponse(w, ErrorResponse{Error: "Метод не поддерживается"}, http.StatusMethodNotAllowed)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Method not supported"}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -364,27 +328,26 @@ func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 	var task Task
 	err := json.NewDecoder(r.Body).Decode(&task)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка десериализации JSON"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): JSON deserialization error"}, http.StatusBadRequest)
 		return
 	}
-	fmt.Printf("Отладка 1 task %v", task)
 
 	// Проверка на наличие идентификатора задачи
 	if task.ID == "" {
-		SendErrorResponse(w, ErrorResponse{Error: "Не указан идентификатор задачи"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Task ID not specified"}, http.StatusBadRequest)
 		return
 	}
 
 	// Проверка корректности идентификатора задачи
 	id, err := strconv.Atoi(task.ID)
 	if err != nil || id <= 0 {
-		SendErrorResponse(w, ErrorResponse{Error: "Некорректный идентификатор задачи"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Invalid task ID"}, http.StatusBadRequest)
 		return
 	}
 
 	// Проверяем обязательное поле title
 	if task.Title == "" {
-		SendErrorResponse(w, ErrorResponse{Error: "Не указан заголовок задачи"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Task title not specified"}, http.StatusBadRequest)
 		return
 	}
 
@@ -396,14 +359,14 @@ func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем формат даты
 	_, err = time.Parse("20060102", task.Date)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Дата представлена в неправильном формате"}, http.StatusBadRequest)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Date is not in the correct format"}, http.StatusBadRequest)
 		return
 	}
 
 	// Проверка формата поля Repeat
 	if task.Repeat != "" {
 		if _, err := strconv.Atoi(task.Repeat[2:]); err != nil || (task.Repeat[0] != 'd' && task.Repeat[0] != 'w' && task.Repeat[0] != 'm' && task.Repeat[0] != 'y') {
-			SendErrorResponse(w, ErrorResponse{Error: "Некорректный формат повторения задачи"}, http.StatusBadRequest)
+			SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Incorrect task repetition format"}, http.StatusBadRequest)
 			return
 		}
 	}
@@ -415,10 +378,10 @@ func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = db.QueryRow("SELECT id FROM scheduler WHERE id = ?", task.ID).Scan(&existingID)
 	if err == sql.ErrNoRows {
-		SendErrorResponse(w, ErrorResponse{Error: "Задача не найдена"}, http.StatusNotFound)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Task not found"}, http.StatusNotFound)
 		return
 	} else if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка проверки существования задачи"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Error checking task existence"}, http.StatusInternalServerError)
 		return
 	}
 
@@ -427,13 +390,13 @@ func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err = db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat, task.ID)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Задача не найдена"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Task not found"}, http.StatusInternalServerError)
 		return
 	}
 
 	response, err := json.Marshal(struct{}{})
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "Ошибка кодирования JSON: %s"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): JSON encoding error"}, http.StatusInternalServerError)
 		return
 	}
 
@@ -441,6 +404,7 @@ func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
+// Обработчик POST-запросов для отметки выполненной задачи
 func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): method not supported"}, http.StatusBadRequest)
@@ -514,6 +478,7 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{}`))
 }
 
+// Обработчик DELETE-запросов на удаление неактуальной задачи
 func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): method not supported"}, http.StatusBadRequest)
@@ -560,7 +525,13 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{}`))
 }
 
+// Обработчик POST-запросов для сверки введенного пароля с паролем в переменной окружения
 func UserAuthorizationHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): method not supported"}, http.StatusBadRequest)
+		return
+	}
+
 	// Чтение тела запроса
 	fmt.Printf("Отладка TODO_PASSWORD: %s\n", os.Getenv("TODO_PASSWORD"))
 	body, err := io.ReadAll(r.Body)
@@ -626,7 +597,6 @@ func comparePasswords(currentPassword string, tokenPasswordHash string) bool {
 func auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pass := os.Getenv("TODO_PASSWORD")
-		fmt.Printf("Отладка pass %v\n", pass)
 		if len(pass) == 0 {
 			// Если пароль не определен, возвращаем ошибку авторизации
 			http.Error(w, "Authorization required", http.StatusUnauthorized)
@@ -640,7 +610,6 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		tokenStr := cookie.Value
-		fmt.Printf("Отладка tokenStr: %v\n", tokenStr)
 		claims := &struct {
 			PasswordHash string `json:"password_hash"`
 			*jwt.StandardClaims
@@ -670,18 +639,6 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 
 func HttpServer(port, wd string) *http.Server {
 	// Создание роутера
-	//mux := http.NewServeMux()
-
-	// Обработчик статических файлов
-	//StaticFileHandler(wd, mux)
-
-	// Обработчики запросов
-	//mux.HandleFunc("/api/nextdate", NextDateHandler)          // Обработчики GET запросов следующей даты
-	//mux.HandleFunc("/api/task", AddTaskHandler)               // Обработчик POST запросов задачи
-	//mux.HandleFunc("/api/tasks", GetListUpcomingTasksHandler) // Обработчик GET запросов получения списка ближайших задач
-	//mux.HandleFunc("/api/task", EditTask)                     // Обработчик GET запросов на редактирование задачи
-
-	// Создание роутера
 	router := mux.NewRouter()
 
 	// Обработчики запросов
@@ -701,8 +658,6 @@ func HttpServer(port, wd string) *http.Server {
 	httpServer := http.Server{
 		Addr:    ":" + port, // Установка адреса сервера
 		Handler: router,     // Установка роутера в качестве обработчика
-		//Handler: mux,        // Установка роутера в качестве обработчика
-
 	}
 
 	// Запуск сервера на указанном порту
@@ -738,8 +693,11 @@ func ChekingDataBase() error {
 	// во второй dbFileDefualt путь к базе данных по умолчанию
 	dbFile := os.Getenv("TODO_DBFILE")
 	dbFileDefualt := filepath.Join(filepath.Dir(appPath), tableName)
+	fmt.Printf("Отладка dbFileDefualt %v \n", dbFileDefualt)
+	fmt.Printf("Отладка dbFile %v \n", dbFile)
 
 	if dbFile == "" {
+		fmt.Printf("Отладка 1 dbFile %v, dbFileDefualt %v \n", dbFile, dbFileDefualt)
 		dbFile = dbFileDefualt
 		_, err = os.Stat(dbFile)
 		if err != nil {
@@ -1085,13 +1043,7 @@ func CalculatDayOfMonthTask(now time.Time, startDate time.Time, daysNum []int) (
 	// Ищем мининимально число в массиве daysNum
 	minNumDay := FindMinNum(daysNum, negativeNum)
 
-	// Расчет nextDate в функции PreliminaryNextDate, позволяет всегда выполняться условию now.Before(nextDate)
-
 	return NowBeforeNextDate(now, nextDate, negativeNum, minNumDay, daysNum)
-	//for now.Before(nextDate) {
-	//NowBeforeNextDate(now, nextDate, negativeNum, minNumDay, daysNum)
-	//}
-	//return "", nil
 }
 
 // Условие: перенос задачи на определенное число указанных месяцев
@@ -1123,12 +1075,7 @@ searchingMonths:
 	// Ищем мининимально число в массиве daysNum
 	minNumDay := FindMinNum(daysNum, negativeNum)
 
-	// Расчет nextDate в функции PreliminaryNextDate, позволяет всегда выполняться условию now.Before(nextDate)
-	//for now.Before(nextDate) {
-	//return NowBeforeNextDate(now, nextDate, negativeNum, minNumDay, daysNum)
-	//}
 	return NowBeforeNextDate(now, nextDate, negativeNum, minNumDay, daysNum)
-	//return "", nil
 }
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
@@ -1164,7 +1111,10 @@ func main() {
 	}
 
 	// Определение директории для файлов
-	webDir := "../web"
+	webDir := os.Getenv("TODO_WEB_DIR")
+	if webDir == "" {
+		webDir = "../web" // Путь по умолчанию для локального запуска
+	}
 
 	// Запуск сервера
 	server := HttpServer(port, webDir)
