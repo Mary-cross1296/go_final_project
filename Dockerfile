@@ -18,11 +18,11 @@ RUN go mod download
 # Копируем все файлы проекта в рабочую директорию образа
 COPY . .
 
-# Копируем базу данных в контейнер
-COPY backend/scheduler.db /app/backend/scheduler.db
-
 # Компилируем программу
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/backend/main ./backend/main.go
+
+# Устанавливаем рабочую директорию
+WORKDIR /app/backend
 
 # Определяем переменные окружения для веб-сервера
 ENV TODO_PORT=7540 \
