@@ -1,12 +1,5 @@
 # Используем базовый образ Ubuntu
-FROM ubuntu:latest
-
-# Устанавливаем необходимые пакеты
-RUN apt-get update && apt-get install -y \
-    golang-go \
-    ca-certificates \
-    curl \
-    sqlite3
+FROM golang:1.21.5
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -30,8 +23,5 @@ ENV TODO_PORT=7540 \
     TODO_PASSWORD=finalgo \
     TODO_WEB_DIR="/app/web"
 
-# Открываем порт веб-сервера
-EXPOSE 7540
-
 # Запускаем сервер
-CMD ["/bin/sh", "-c", "/app/backend/main"]
+CMD ["/app/backend/main"]

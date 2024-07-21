@@ -17,6 +17,8 @@ func TestTask(t *testing.T) {
 
 	now := time.Now()
 
+	fmt.Printf("Отладка now %v \n", now)
+
 	task := task{
 		date:    now.Format(`20060102`),
 		title:   "Созвон в 16:00",
@@ -24,13 +26,18 @@ func TestTask(t *testing.T) {
 		repeat:  "d 5",
 	}
 
+	fmt.Printf("Отладка task %v \n", task)
+
 	todo := addTask(t, task)
+	fmt.Printf("Отладка id task %v \n", todo)
 
 	body, err := requestJSON("api/task", nil, http.MethodGet)
 	assert.NoError(t, err)
 	var m map[string]string
 	err = json.Unmarshal(body, &m)
 	assert.NoError(t, err)
+
+	fmt.Printf("Отладка 1 m %v \n", m)
 
 	e, ok := m["error"]
 	assert.False(t, !ok || len(fmt.Sprint(e)) == 0,
@@ -40,6 +47,8 @@ func TestTask(t *testing.T) {
 	assert.NoError(t, err)
 	err = json.Unmarshal(body, &m)
 	assert.NoError(t, err)
+
+	fmt.Printf("Отладка 2 m %v \n", m)
 
 	assert.Equal(t, todo, m["id"])
 	assert.Equal(t, task.date, m["date"])

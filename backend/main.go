@@ -138,9 +138,23 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверка формата поля Repeat
+	fmt.Printf("Отладка task.Repeat %v \n", task.Repeat)
+	if task.Repeat != "" {
+		dateCheck, err := NextDate(time.Now(), task.Date, task.Repeat)
+		fmt.Printf("Отладка dateCheck %v \n", dateCheck)
+		fmt.Printf("Отладка err %v \n", err)
+		if dateCheck == "" && err != nil {
+			fmt.Printf("Отладка 66 err %v \n", err)
+			SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler() Invalid repetition condition"}, http.StatusBadRequest)
+			return
+		}
+	}
+
 	now := time.Now()
 	if date.Before(now) {
-		if task.Repeat == "" {
+
+		if task.Repeat == "" || date.Truncate(24*time.Hour) == date.Truncate(24*time.Hour) {
 			task.Date = time.Now().Format("20060102")
 		} else {
 			dateStr := date.Format("20060102")
@@ -173,6 +187,7 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Устанавливаем полученный id в качестве строки
 	task.ID = fmt.Sprint(id)
+	fmt.Printf("Отладка 666 ефыл %v \n", task)
 
 	response := map[string]interface{}{"id": id}
 	responseId, err := json.Marshal(response)
