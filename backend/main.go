@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -625,6 +627,7 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		tokenStr := cookie.Value
+
 		claims := &struct {
 			PasswordHash string `json:"password_hash"`
 			*jwt.StandardClaims
@@ -1136,6 +1139,112 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 	}
 }
 
+// Функция для получения нового токена
+func getAndUpdateToken() error {
+	// Определите URL и пароль для запроса
+	url := "http://localhost:7540/api/signin"
+	password := "finalgo"
+
+	// Создание JSON тела запроса
+	passwordData := Password{Password: password}
+	body, err := json.Marshal(passwordData)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %v", err)
+	}
+
+	// Отправка POST запроса
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("error sending POST request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Проверка кода состояния
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("received non-OK response status: %s", resp.Status)
+	}
+
+	// Чтение ответа
+	var tokenResponse map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
+	if err != nil {
+		return fmt.Errorf("error decoding response body: %v", err)
+	}
+
+	// Извлечение токена
+	token, ok := tokenResponse["token"]
+	if !ok {
+		return fmt.Errorf("token not found in response")
+	}
+
+	// Логирование полученного токена
+	fmt.Printf("Отладка полученный token %s\n", token)
+
+	// Обновление файла settings.go
+	settingsFile := "../tests/settings.go"
+
+	err = updateSettingsFile(settingsFile, token)
+	if err != nil {
+		return fmt.Errorf("error updating settings file: %v", err)
+	}
+	return nil
+}
+
+// Функция для обновления файла settings.go
+func updateSettingsFile(filename, token string) error {
+	// Проверка, существует ли файл
+	if !fileExists(filename) {
+		return fmt.Errorf("файл '%s' не существует", filename)
+	}
+
+	// Открытие файла для чтения
+	file, err := os.Open(filename)
+	if err != nil {
+		return fmt.Errorf("ошибка открытия файла настроек: %v", err)
+	}
+	defer file.Close()
+
+	// Чтение содержимого файла
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("ошибка чтения файла настроек: %v", err)
+	}
+
+	// Логирование текущего содержимого файла
+	fmt.Printf("Содержимое файла до обновления:\n%s\n", string(content))
+
+	// Регулярное выражение для поиска строки токена
+	re := regexp.MustCompile(`(?m)^var Token = ` + "`.*`")
+	newTokenLine := fmt.Sprintf("var Token = `%s`", token)
+
+	// Замена старого токена на новый
+	newContent := re.ReplaceAllString(string(content), newTokenLine)
+
+	// Открытие файла для записи
+	file, err = os.OpenFile(filename, os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("ошибка открытия файла настроек для записи: %v", err)
+	}
+	defer file.Close()
+
+	// Запись обновленного содержимого обратно в файл
+	_, err = file.WriteString(newContent)
+	if err != nil {
+		return fmt.Errorf("ошибка записи в файл настроек: %v", err)
+	}
+
+	// Логирование содержимого файла после обновления
+	fmt.Printf("Содержимое файла после обновления:\n%s\n", newContent)
+
+	return nil
+}
+
+// Функция для проверки существования файла
+func fileExists(filepath string) bool {
+	_, err := os.Stat(filepath)
+	return !os.IsNotExist(err)
+}
+
 func main() {
 	// Определение порта
 	port := os.Getenv("TODO_PORT")
@@ -1153,6 +1262,13 @@ func main() {
 	// Запуск сервера
 	server := HttpServer(port, webDir)
 	ChekingDataBase()
+
+	// Получение и обновление токена
+	if err := getAndUpdateToken(); err != nil {
+		fmt.Printf("Error updating token: %v\n", err)
+	} else {
+		fmt.Println("Token updated successfully")
+	}
 
 	// Создание канала для поступления сигналов
 	sigs := make(chan os.Signal, 1)
