@@ -27,17 +27,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type Scheduler struct {
-	ID      int
-	Date    time.Duration
-	Title   string
-	Comment string
-	Repeat  string
-}
+const jwtKey = "final_progect_go" // секретный ключ для подписи JWT
 
 // Task представляет задачу
 type Task struct {
-	//ID      int64  `json:"id"`
 	ID      string `json:"id"`
 	Date    string `json:"date"`
 	Title   string `json:"title"`
@@ -53,8 +46,6 @@ type ErrorResponse struct {
 type Password struct {
 	Password string `json:"password"`
 }
-
-var jwtKey = []byte("final_progect_go") // секретный ключ для подписи JWT
 
 type Token struct {
 	Token string `json:"token"`
@@ -586,7 +577,7 @@ func UserAuthorizationHandler(w http.ResponseWriter, r *http.Request) {
 		claims,
 	})
 
-	tokenString, err := token.SignedString(jwtKey)
+	tokenString, err := token.SignedString([]byte(jwtKey))
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "UserAuthorizationHandler(): Token signing error"}, http.StatusInternalServerError)
 		return
@@ -636,7 +627,7 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 		// Попытка расшифровать и проверить токен
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			// Возвращаем секретный ключ для проверки подписи токена
-			return jwtKey, nil
+			return []byte(jwtKey), nil
 		})
 
 		if err != nil || !token.Valid {
@@ -1181,9 +1172,9 @@ func getAndUpdateToken() error {
 	fmt.Printf("Отладка полученный token %s\n", token)
 
 	// Обновление файла settings.go
-	settingsFile := "../tests/settings.go"
+	settingsFilePath := "../tests/settings.go"
 
-	err = updateSettingsFile(settingsFile, token)
+	err = updateSettingsFile(settingsFilePath, token)
 	if err != nil {
 		return fmt.Errorf("error updating settings file: %v", err)
 	}
@@ -1191,14 +1182,14 @@ func getAndUpdateToken() error {
 }
 
 // Функция для обновления файла settings.go
-func updateSettingsFile(filename, token string) error {
+func updateSettingsFile(filePath, token string) error {
 	// Проверка, существует ли файл
-	if !fileExists(filename) {
-		return fmt.Errorf("файл '%s' не существует", filename)
+	if !fileExists(filePath) {
+		return fmt.Errorf("файл '%s' не существует", filePath)
 	}
 
 	// Открытие файла для чтения
-	file, err := os.Open(filename)
+	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("ошибка открытия файла настроек: %v", err)
 	}
@@ -1221,7 +1212,7 @@ func updateSettingsFile(filename, token string) error {
 	newContent := re.ReplaceAllString(string(content), newTokenLine)
 
 	// Открытие файла для записи
-	file, err = os.OpenFile(filename, os.O_RDWR|os.O_TRUNC, 0644)
+	file, err = os.OpenFile(filePath, os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("ошибка открытия файла настроек для записи: %v", err)
 	}
