@@ -115,7 +115,13 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Выполняем запрос INSERT в базу данных
 	tableName := "scheduler.db"
-	db, _ := storage.OpenDataBase(tableName)
+	db, err := storage.OpenDataBase(tableName)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
 	query := "INSERT INTO scheduler (date, title, comment, repeat) VALUES (?, ?, ?, ?)"
 
 	res, err := db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
@@ -133,7 +139,6 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Устанавливаем полученный id в качестве строки
 	task.ID = fmt.Sprint(id)
-	fmt.Printf("Отладка 666 ефыл %v \n", task)
 
 	response := map[string]interface{}{"id": id}
 	responseId, err := json.Marshal(response)
@@ -160,7 +165,12 @@ func GetListUpcomingTasksHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	tableName := "scheduler.db"
-	db, _ := storage.OpenDataBase(tableName)
+
+	db, err := storage.OpenDataBase(tableName)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
+		return
+	}
 	defer db.Close()
 
 	search := r.FormValue("search")
@@ -246,13 +256,17 @@ func GetTaskForEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tableName := "scheduler.db"
-	db, _ := storage.OpenDataBase(tableName)
+	db, err := storage.OpenDataBase(tableName)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
+		return
+	}
 	defer db.Close()
 
 	var task storage.Task
 	var id int64
 
-	err := db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParam).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	err = db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParam).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 	if err == sql.ErrNoRows {
 		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): Task not found"}, http.StatusNotFound)
 		return
@@ -335,7 +349,12 @@ func SaveEditTaskHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверка существования задачи перед обновлением
 	var existingID int
 	tableName := "scheduler.db"
-	db, _ := storage.OpenDataBase(tableName)
+	db, err := storage.OpenDataBase(tableName)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
 
 	err = db.QueryRow("SELECT id FROM scheduler WHERE id = ?", task.ID).Scan(&existingID)
 	if err == sql.ErrNoRows {
@@ -381,12 +400,16 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	idParamNum, _ := strconv.Atoi(idParam)
 
 	tableName := "scheduler.db"
-	db, _ := storage.OpenDataBase(tableName)
+	db, err := storage.OpenDataBase(tableName)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
+		return
+	}
 	defer db.Close()
 
 	var task storage.Task
 	var id int64
-	err := db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParamNum).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	err = db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParamNum).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 	task.ID = fmt.Sprint(id)
 	fmt.Printf("Отладка 1 task %v \n", task)
 	if err == sql.ErrNoRows {
@@ -461,7 +484,11 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Отладка Delete idParamNum %v \n", idParamNum)
 
 	tableName := "scheduler.db"
-	db, _ := storage.OpenDataBase(tableName)
+	db, err := storage.OpenDataBase(tableName)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
+		return
+	}
 	defer db.Close()
 
 	query := "DELETE FROM scheduler WHERE id = ?"

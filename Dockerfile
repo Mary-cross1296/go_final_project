@@ -3,15 +3,12 @@ FROM golang:1.21.5
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем go.mod и go.sum для установки зависимостей
-COPY go.mod go.sum ./
-RUN go mod download
-
 # Копируем все файлы проекта в рабочую директорию образа
 COPY . .
+RUN go mod download
 
 # Компилируем программу
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/backend/main ./backend/main.go
+RUN CGO_ENABLED=1 GOOS=linux go build -o /app/backend/main ./backend/main.go
 
 # Устанавливаем рабочую директорию
 WORKDIR /app/backend

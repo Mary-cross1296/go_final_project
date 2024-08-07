@@ -48,6 +48,7 @@ func ChekingDataBase() error {
 	tableName := "scheduler.db"
 
 	appPath, err := os.Executable()
+	log.Printf("ChekingDataBase() %v", appPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,7 +57,7 @@ func ChekingDataBase() error {
 	// в первой dbFile путь из переменной окружения
 	// во второй dbFileDefualt путь к базе данных по умолчанию
 	dbFile := os.Getenv("TODO_DBFILE")
-	log.Printf("Отладка 1 dbFile %v", dbFile)
+	log.Printf("Отладка 1 TODO_DBFILE %v", os.Getenv("TODO_DBFILE"))
 	dbFileDefualt := filepath.Join(filepath.Dir(appPath), tableName)
 	log.Printf("Отладка 2 dbFileDefualt %v", dbFileDefualt)
 

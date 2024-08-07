@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -12,9 +13,19 @@ import (
 	"github.com/Mary-cross1296/go_final_project/api"
 	"github.com/Mary-cross1296/go_final_project/storage"
 	"github.com/Mary-cross1296/go_final_project/utils"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	//Загрузка переменных окружения
+	err := godotenv.Load()
+	if err != nil {
+		log.Print("Error loading .env file")
+	}
+
+	passwordCorrect := os.Getenv("TODO_PASSWORD")
+	fmt.Print(passwordCorrect)
+
 	// Определение порта
 	port := os.Getenv("TODO_PORT")
 	defaultPort := 7540 // Порт по умолчанию
@@ -27,6 +38,8 @@ func main() {
 	if webDir == "" {
 		webDir = "../web" // Путь по умолчанию для локального запуска
 	}
+
+	log.Printf("Путь к базе данных: %s", os.Getenv("TODO_DBFILE"))
 
 	// Запуск сервера
 	server := api.HttpServer(port, webDir)
