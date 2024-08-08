@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"log"
 	"os"
 	"os/signal"
@@ -16,15 +16,17 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Глобальная переменная для подключения к базе данных
+var Db *sql.DB
+
+const TableName = "scheduler.db"
+
 func main() {
 	//Загрузка переменных окружения
 	err := godotenv.Load()
 	if err != nil {
 		log.Print("Error loading .env file")
 	}
-
-	passwordCorrect := os.Getenv("TODO_PASSWORD")
-	fmt.Print(passwordCorrect)
 
 	// Определение порта
 	port := os.Getenv("TODO_PORT")
@@ -39,17 +41,24 @@ func main() {
 		webDir = "../web" // Путь по умолчанию для локального запуска
 	}
 
-	log.Printf("Путь к базе данных: %s", os.Getenv("TODO_DBFILE"))
+	// Проверка существования файла базы данных
+	storage.ChekingDataBase(TableName)
+
+	// Инициализация базы данных
+	Db, err := storage.OpenDataBase(TableName)
+	if err != nil {
+		log.Fatalf("Main(): Error opening database: %s\n", err)
+	}
+	defer Db.Close()
 
 	// Запуск сервера
-	server := api.HttpServer(port, webDir)
-	storage.ChekingDataBase()
+	server := api.HttpServer(port, webDir, Db)
 
 	// Получение и обновление токена
 	if err := utils.GetAndUpdateToken(); err != nil {
-		fmt.Printf("Error updating token: %v\n", err)
+		log.Printf("Error updating token: %v\n", err)
 	} else {
-		fmt.Println("Token updated successfully")
+		log.Println("Token updated successfully")
 	}
 
 	// Создание канала для поступления сигналов
@@ -58,15 +67,15 @@ func main() {
 	for {
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 		sig = <-sigs
-		fmt.Println()
-		fmt.Println("signal:", sig)
+		log.Println()
+		log.Println("signal:", sig)
 		if sig == syscall.SIGINT || sig == syscall.SIGTERM {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := server.Shutdown(ctx); err != nil {
-				fmt.Printf("Error during stop: %v\n", err)
+				log.Printf("Error during stop: %v\n", err)
 			}
-			fmt.Printf("Server stopped correctly")
+			log.Printf("Server stopped correctly")
 			break
 		}
 	}
