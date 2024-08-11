@@ -18,7 +18,9 @@ var (
 func LoadEnvVar(envPath string) {
 	err := godotenv.Load(envPath)
 	if err != nil {
-		log.Print("Error loading .env file")
+		log.Printf("Error loading .env file from path %s: %v", envPath, err)
+	} else {
+		log.Printf(".env file loaded successfully from path %s", envPath)
 	}
 }
 

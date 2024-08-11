@@ -45,64 +45,53 @@ func CreateTableWithIndex(db *DataBase) error {
 	return nil
 }
 
+// fileDoesNotExist проверяет, существует ли файл
+func fileDoesNotExist(path string) bool {
+	_, err := os.Stat(path)
+	return os.IsNotExist(err)
+}
+
+// ChekingDataBase проверяет существование файла базы данных.
+// Если файла нет, он создает его и инициализирует базу данных.
 func ChekingDataBase(tableName string) error {
-	//appPath, err := os.Executable()
+	// Получаем текущую рабочую директорию
 	appPath, err := os.Getwd()
-	//log.Printf("ChekingDataBase() appPath %v", appPath)
-	//log.Printf("ChekingDataBase() appPath1 %v", appPath1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Определение пути к файлу БД. Создаем две переменные:
-	// в первой dbFile путь из переменной окружения
-	// во второй dbFileDefualt путь к базе данных по умолчанию
-	//dbFile := os.Getenv("TODO_DBFILE")
+	// Определяем путь к базе данных
 	dbFile := config.DBPathConfig
-	//log.Printf("Отладка 1 TODO_DBFILE %v", os.Getenv("TODO_DBFILE"))
-	dbFileDefualt := filepath.Join(filepath.Dir(appPath), tableName)
-	//log.Printf("Отладка 2 dbFileDefualt %v", dbFileDefualt)
+	dbFileDefault := filepath.Join(appPath, tableName)
 
-	if dbFile == "" {
-		dbFile = dbFileDefualt
-		//log.Printf("Отладка 3 dbFile %v", dbFile)
-		_, err = os.Stat(dbFile)
+	switch {
+	// Если путь к базе данных не задан, используем путь по умолчанию
+	case dbFile == "":
+		dbFile = dbFileDefault
+		fallthrough // Переход к следующему случаю для проверки существования файла
+
+	// Если файл базы данных не существует, создаем его
+	case fileDoesNotExist(dbFile):
+		log.Printf("Database file not found: %s\nA new database file will be created...\n", dbFile)
+
+		// Функция, которая открывает БД
+		db, err := OpenDataBase(dbFile)
 		if err != nil {
-			log.Printf("Database file information missing: %s \nA new database file will be created... \n", err)
-			// Функция, которая открывает БД
-			db, err := OpenDataBase(tableName)
-			defer db.Close()
-			if err != nil {
-				log.Printf("%s", err)
-				return err
-			}
-			// Функция, которая создает таблицу и индекс
-			err = CreateTableWithIndex(db)
-			if err != nil {
-				log.Printf("%s", err)
-				return err
-			}
-		} else {
-			log.Println("The database file already exists")
+			log.Printf("Error opening database: %s", err)
+			return err
 		}
-	} else {
-		_, err = os.Stat(dbFile)
-		if err != nil {
-			log.Printf("Database file information missing: %s \nA new database file will be created... \n", err)
-			// Функция, которая открывает БД
-			db, err := OpenDataBase(tableName)
-			defer db.Close()
-			if err != nil {
-				log.Printf("%s", err)
-				return err
-			}
-			// Функция, которая создает таблицу и индекс
-			err = CreateTableWithIndex(db)
-			if err != nil {
-				log.Printf("%s", err)
-				return err
-			}
+		defer db.Close()
+
+		// Функция, которая создает таблицу и индекс
+		if err := CreateTableWithIndex(db); err != nil {
+			log.Printf("Error creating table and index: %s", err)
+			return err
 		}
+
+		log.Println("New database file created successfully")
+
+	// Если файл базы данных существует
+	default:
 		log.Println("The database file already exists")
 	}
 	return nil

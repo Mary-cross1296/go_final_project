@@ -31,16 +31,13 @@ func main() {
 	config.Init()
 
 	// Определение порта
-	//port := os.Getenv("TODO_PORT")
 	port := config.PortConfig
-	//fmt.Printf("Отладка переменная TODO_PASSWORD %v \n", config.PassConfig)
 	defaultPort := 7540 // Порт по умолчанию
 	if port == "" {
 		port = strconv.Itoa(defaultPort)
 	}
 
 	// Определение директории для файлов
-	//webDir := os.Getenv("TODO_WEB_DIR")
 	webDir := config.WebDirPathConfig
 	if webDir == "" {
 		webDir = "../web" // Путь по умолчанию для локального запуска

@@ -10,13 +10,18 @@ import (
 	"regexp"
 
 	"github.com/Mary-cross1296/go_final_project/auth"
+	"github.com/Mary-cross1296/go_final_project/config"
 )
 
 // Функция для получения нового токена
 func GetAndUpdateToken() error {
 	// Определите URL и пароль для запроса
 	url := "http://localhost:7540/api/signin"
-	password := "finalgo"
+
+	password := config.PassConfig
+	if password == "" {
+		password = "finalgo"
+	}
 
 	// Создание JSON тела запроса
 	passwordData := auth.Password{Password: password}
@@ -50,9 +55,6 @@ func GetAndUpdateToken() error {
 		return fmt.Errorf("token not found in response")
 	}
 
-	// Логирование полученного токена
-	//fmt.Printf("Отладка полученный token %s\n", token)
-
 	// Обновление файла settings.go
 	settingsFilePath := "../tests/settings.go"
 
@@ -83,9 +85,6 @@ func UpdateSettingsFile(filePath, token string) error {
 		return fmt.Errorf("ошибка чтения файла настроек: %v", err)
 	}
 
-	// Логирование текущего содержимого файла
-	//fmt.Printf("Содержимое файла до обновления:\n%s\n", string(content))
-
 	// Регулярное выражение для поиска строки токена
 	re := regexp.MustCompile(`(?m)^var Token = ` + "`.*`")
 	newTokenLine := fmt.Sprintf("var Token = `%s`", token)
@@ -105,10 +104,6 @@ func UpdateSettingsFile(filePath, token string) error {
 	if err != nil {
 		return fmt.Errorf("ошибка записи в файл настроек: %v", err)
 	}
-
-	// Логирование содержимого файла после обновления
-	//fmt.Printf("Содержимое файла после обновления:\n%s\n", newContent)
-
 	return nil
 }
 

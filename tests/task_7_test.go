@@ -2,7 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -25,7 +24,6 @@ func TestDone(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-	fmt.Printf("Отладка %v", now)
 	id := addTask(t, task{
 		date:  now.Format(`20060102`),
 		title: "Свести баланс",

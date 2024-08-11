@@ -18,8 +18,6 @@ func addTask(t *testing.T, task task) string {
 		"repeat":  task.repeat,
 	}, http.MethodPost)
 
-	fmt.Printf("Отладка addtask task  %v \n", task)
-
 	assert.NoError(t, err)
 	assert.NotNil(t, ret["id"])
 	id := fmt.Sprint(ret["id"])
@@ -33,12 +31,10 @@ func getTasks(t *testing.T, search string) []map[string]string {
 		url += "?search=" + search
 	}
 	body, err := requestJSON(url, nil, http.MethodGet)
-	//fmt.Printf("Отладка body %v \n", string(body)) // Выводим тело ответа как строку
 	assert.NoError(t, err)
 
 	var m map[string][]map[string]string
 	err = json.Unmarshal(body, &m)
-	//fmt.Printf("Отладка m %v \n", m)
 	assert.NoError(t, err)
 	return m["tasks"]
 }
@@ -76,7 +72,6 @@ func TestTasks(t *testing.T) {
 		repeat:  "d 30",
 	})
 	tasks = getTasks(t, "")
-	//fmt.Printf("Отладка tasks %v \n", tasks)
 	assert.Equal(t, len(tasks), 3)
 
 	now = now.AddDate(0, 0, 2)
@@ -101,19 +96,14 @@ func TestTasks(t *testing.T) {
 	})
 
 	tasks = getTasks(t, "")
-	//fmt.Printf("Отладка тесты tasks %v \n", tasks)
 	assert.Equal(t, len(tasks), 6)
 
 	if !Search {
 		return
 	}
-	//fmt.Printf("Отладка тесты Search %v \n", Search)
 	tasks = getTasks(t, "УК")
 	assert.Equal(t, len(tasks), 1)
-	//fmt.Printf("Отладка 1 len(tasks) %v", len(tasks))
 	tasks = getTasks(t, now.Format(`02.01.2006`))
-	//fmt.Printf("Отладка 2 len(tasks) %v", len(tasks))
-	//fmt.Printf("Отладка 3 now.Format(`02.01.2006`) %v", now.Format(`02.01.2006`))
 	assert.Equal(t, len(tasks), 3)
 
 }

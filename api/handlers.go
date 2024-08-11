@@ -87,13 +87,9 @@ func (h *Handlers) AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Проверка формата поля Repeat
-	//fmt.Printf("Отладка task.Repeat %v \n", task.Repeat)
 	if task.Repeat != "" {
 		dateCheck, err := dateCalc.NextDate(time.Now(), task.Date, task.Repeat)
-		//fmt.Printf("Отладка dateCheck %v \n", dateCheck)
-		//fmt.Printf("Отладка err %v \n", err)
 		if dateCheck == "" && err != nil {
-			//fmt.Printf("Отладка 66 err %v \n", err)
 			SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler() Invalid repetition condition"}, http.StatusBadRequest)
 			return
 		}
@@ -114,16 +110,6 @@ func (h *Handlers) AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 			task.Date = nextDate
 		}
 	}
-
-	// Выполняем запрос INSERT в базу данных
-	//tableName := "scheduler.db"
-	//db, err := storage.OpenDataBase(tableName)
-	//if err != nil {
-	//SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
-	//return
-	//}
-	//defer db.Close()
-	//db := h.DB
 
 	query := "INSERT INTO scheduler (date, title, comment, repeat) VALUES (?, ?, ?, ?)"
 
@@ -166,15 +152,6 @@ func (h *Handlers) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	var task storage.Task
 	var rows *sql.Rows
 	var err error
-
-	//tableName := "scheduler.db"
-
-	//db, err := storage.OpenDataBase(tableName)
-	//if err != nil {
-	//SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
-	//return
-	//}
-	//defer db.Close()
 
 	search := r.FormValue("search")
 
@@ -244,7 +221,6 @@ func (h *Handlers) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	// Формируем ответ в формате JSON объекта с ключом "tasks"
 	responseMap := map[string][]storage.Task{"tasks": tasks}
 	response, err := json.Marshal(responseMap)
-	//fmt.Printf("GetListUpcomingTasksHandler - response: %v\n", string(response))
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): JSON generation error"}, http.StatusInternalServerError)
 		return
@@ -269,14 +245,6 @@ func (h *Handlers) GetTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//tableName := "scheduler.db"
-	//db, err := storage.OpenDataBase(tableName)
-	//if err != nil {
-	//SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
-	//return
-	//}
-	//defer db.Close()
-
 	var task storage.Task
 	var id int64
 
@@ -300,8 +268,6 @@ func (h *Handlers) GetTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	responseStr := fmt.Sprintf(string(response))
-	fmt.Printf("Отладка %v", responseStr)
 	_, _ = w.Write(response)
 }
 
@@ -360,16 +326,6 @@ func (h *Handlers) SaveTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Проверка существования задачи перед обновлением
-	//var existingID int
-	//tableName := "scheduler.db"
-	//db, err := storage.OpenDataBase(tableName)
-	//if err != nil {
-	//SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
-	//return
-	//}
-	//defer db.Close()
-
 	// Выполняем запрос UPDATE в базу данных
 	query := "UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat =? WHERE id = ?"
 
@@ -413,16 +369,7 @@ func (h *Handlers) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task ID not specified"}, http.StatusBadRequest)
 		return
 	}
-	fmt.Printf("Отладка 0 idParam %v \n", idParam)
 	idParamNum, _ := strconv.Atoi(idParam)
-
-	//tableName := "scheduler.db"
-	//db, err := storage.OpenDataBase(tableName)
-	//if err != nil {
-	//SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
-	//return
-	//}
-	//defer db.Close()
 
 	var task storage.Task
 	var id int64
@@ -502,16 +449,6 @@ func (h *Handlers) DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//fmt.Printf("Отладка Delete idParamNum %v \n", idParamNum)
-
-	//tableName := "scheduler.db"
-	//db, err := storage.OpenDataBase(tableName)
-	//if err != nil {
-	//SendErrorResponse(w, ErrorResponse{Error: fmt.Sprintf("Error opening database: %v", err)}, http.StatusInternalServerError)
-	//return
-	//}
-	//defer db.Close()
-
 	query := "DELETE FROM scheduler WHERE id = ?"
 	result, err := h.DB.Exec(query, idParamNum)
 	if err != nil {
@@ -544,7 +481,6 @@ func UserAuthorizationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Чтение тела запроса
-	//fmt.Printf("Отладка TODO_PASSWORD: %s\n", os.Getenv("TODO_PASSWORD"))
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "UserAuthorizationHandler(): Error reading request body"}, http.StatusBadRequest)

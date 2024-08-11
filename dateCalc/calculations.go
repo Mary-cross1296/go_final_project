@@ -3,6 +3,7 @@ package dateCalc
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +16,7 @@ func CalculatDailyTask(now time.Time, startDate time.Time, repeat string) (strin
 	days, err := strconv.Atoi(strings.TrimPrefix(repeat, "d "))
 
 	if err != nil {
-		fmt.Printf("Error converting string to number:%s \n", err)
+		log.Printf("Error converting string to number:%s \n", err)
 		return "", err
 	}
 
@@ -70,7 +71,7 @@ func CalculatWeeklyTask(now time.Time, startDate time.Time, repeat string) (stri
 		// Форматируем строки в целые числа и добавляем в новый числовой массив
 		dayNum, err := strconv.Atoi(dayStr)
 		if err != nil {
-			fmt.Printf("Error converting string to number: %s", err)
+			log.Printf("Error converting string to number: %s", err)
 			return "", err
 		}
 		if dayNum < 1 || dayNum > 7 {
@@ -79,7 +80,6 @@ func CalculatWeeklyTask(now time.Time, startDate time.Time, repeat string) (stri
 		}
 		daysWeekNum = append(daysWeekNum, dayNum)
 	}
-	//fmt.Printf("Отладка daysWeekNum %v \n", daysWeekNum)
 
 	nextDate := startDate                         // Если now находится в прошлом относительно startDate
 	if now == startDate || now.After(startDate) { // Если now равно startDate или если now в будущем относительно starDate
@@ -121,7 +121,7 @@ func CalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (str
 		for _, day := range daysStr {
 			dayNum, err := strconv.Atoi(day)
 			if err != nil {
-				fmt.Printf("Error converting string to number: %s", err)
+				log.Printf("Error converting string to number: %s", err)
 				return "", err
 			}
 
@@ -145,14 +145,11 @@ func CalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (str
 	for _, day := range numList1 {
 		dayNum, err := strconv.Atoi(day)
 		if err != nil {
-			fmt.Printf("Error converting string to number: %s", err)
+			log.Printf("Error converting string to number: %s", err)
 			return "", err
 		}
 		daysNum = append(daysNum, dayNum)
 	}
-	// Преобразуем единственный элемент первого массива в число
-	// Получаем день задачи
-	//dayNum, _ := strconv.Atoi(numList1[0])
 
 	// Преобразуем элементы второго массива в числа
 	// Создаем новый числовой массив
@@ -160,7 +157,7 @@ func CalculatMonthlyTask(now time.Time, startDate time.Time, repeat string) (str
 	for _, month := range numList2 {
 		monthNum, err := strconv.Atoi(month)
 		if err != nil {
-			fmt.Printf("Error converting string to number: %s", err)
+			log.Printf("Error converting string to number: %s", err)
 			return "", err
 		}
 
@@ -220,10 +217,10 @@ searchingMonths:
 }
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
-	// Парсин стартового-исходного времени, когда задача была выполнена первый раз
+	// Парсинг стартового-исходного времени, когда задача была выполнена первый раз
 	startDate, err := time.Parse(DateTemplate, date)
 	if err != nil {
-		fmt.Printf("The start time cannot be converted to a valid date: %s", err)
+		log.Printf("The start time cannot be converted to a valid date: %s", err)
 		return "", err
 	}
 

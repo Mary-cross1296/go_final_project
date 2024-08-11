@@ -19,7 +19,6 @@ func comparePasswords(currentPassword string, tokenPasswordHash string) bool {
 
 func Auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		//pass := os.Getenv("TODO_PASSWORD")
 		pass := config.PassConfig
 		if len(pass) == 0 {
 			// Если пароль не определен, возвращаем ошибку авторизации

@@ -131,7 +131,6 @@ func TestAddTask(t *testing.T) {
 			var task Task
 			var mid any
 			mid, ok = m["id"]
-			fmt.Printf("Отладка mid %v \n", mid)
 			if !ok {
 				t.Errorf("Не возвращён id для задачи %v", v)
 				continue

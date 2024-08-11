@@ -19,8 +19,5 @@ ENV TODO_PORT=7540 \
     TODO_PASSWORD=finalgo \
     TODO_WEB_DIR="/app/web"
 
-# Убедитесь, что файл базы данных существует и имеет правильные права доступа
-RUN touch /app/backend/scheduler.db && chmod 666 /app/backend/scheduler.db
-
 # Запускаем сервер
 CMD ["/app/backend/main"]
