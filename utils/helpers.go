@@ -51,7 +51,7 @@ func GetAndUpdateToken() error {
 	}
 
 	// Логирование полученного токена
-	fmt.Printf("Отладка полученный token %s\n", token)
+	//fmt.Printf("Отладка полученный token %s\n", token)
 
 	// Обновление файла settings.go
 	settingsFilePath := "../tests/settings.go"
@@ -84,7 +84,7 @@ func UpdateSettingsFile(filePath, token string) error {
 	}
 
 	// Логирование текущего содержимого файла
-	fmt.Printf("Содержимое файла до обновления:\n%s\n", string(content))
+	//fmt.Printf("Содержимое файла до обновления:\n%s\n", string(content))
 
 	// Регулярное выражение для поиска строки токена
 	re := regexp.MustCompile(`(?m)^var Token = ` + "`.*`")
@@ -107,7 +107,7 @@ func UpdateSettingsFile(filePath, token string) error {
 	}
 
 	// Логирование содержимого файла после обновления
-	fmt.Printf("Содержимое файла после обновления:\n%s\n", newContent)
+	//fmt.Printf("Содержимое файла после обновления:\n%s\n", newContent)
 
 	return nil
 }

@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const DateTemplate = "20060102"
+
 // Условие: задача повторяется каждый раз через заданное кол-во дней
 func CalculatDailyTask(now time.Time, startDate time.Time, repeat string) (string, error) {
 	days, err := strconv.Atoi(strings.TrimPrefix(repeat, "d "))
@@ -23,16 +25,16 @@ func CalculatDailyTask(now time.Time, startDate time.Time, repeat string) (strin
 	}
 
 	var nextDate time.Time
-	if days == 1 && now.Format("20060102") == startDate.Format("20060102") {
+	if days == 1 && now.Format(DateTemplate) == startDate.Format(DateTemplate) {
 		nextDate = now
-		return nextDate.Format("20060102"), nil
+		return nextDate.Format(DateTemplate), nil
 	}
 
 	nextDate = startDate
 	// Рассматриваем вариант, когда дата начала(starDate) задачи находится в будущем относительно текущего времени(now)
 	if now.Before(nextDate) || now == nextDate {
 		nextDate = nextDate.AddDate(0, 0, days)
-		return nextDate.Format("20060102"), nil
+		return nextDate.Format(DateTemplate), nil
 	}
 
 	// Рассматриваем вариант, когда дата начала задачи(starDate) находится в прошлом относительно текущего времени(now)
@@ -40,7 +42,7 @@ func CalculatDailyTask(now time.Time, startDate time.Time, repeat string) (strin
 		nextDate = nextDate.AddDate(0, 0, days)
 	}
 
-	return nextDate.Format("20060102"), nil
+	return nextDate.Format(DateTemplate), nil
 }
 
 // Условие: перенос задачи на год вперед
@@ -49,7 +51,7 @@ func CalculatYearlyTask(now time.Time, startDate time.Time) (string, error) {
 	for now.After(nextDate) {
 		nextDate = nextDate.AddDate(1, 0, 0)
 	}
-	return nextDate.Format("20060102"), nil
+	return nextDate.Format(DateTemplate), nil
 }
 
 // Условие: перенос задачи на один из указанных дней недели
@@ -96,7 +98,7 @@ func CalculatWeeklyTask(now time.Time, startDate time.Time, repeat string) (stri
 
 		for _, dayWeek := range daysWeekNum {
 			if dayWeek == int(nextDate.Weekday()) || (dayWeek == 7 && nextDate.Weekday() == 0) {
-				return nextDate.Format("20060102"), nil
+				return nextDate.Format(DateTemplate), nil
 			}
 		}
 		nextDate = nextDate.AddDate(0, 0, 1)
@@ -219,7 +221,7 @@ searchingMonths:
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 	// Парсин стартового-исходного времени, когда задача была выполнена первый раз
-	startDate, err := time.Parse("20060102", date)
+	startDate, err := time.Parse(DateTemplate, date)
 	if err != nil {
 		fmt.Printf("The start time cannot be converted to a valid date: %s", err)
 		return "", err

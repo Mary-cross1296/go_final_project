@@ -2,8 +2,8 @@ package auth
 
 import (
 	"net/http"
-	"os"
 
+	"github.com/Mary-cross1296/go_final_project/config"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,7 +19,8 @@ func comparePasswords(currentPassword string, tokenPasswordHash string) bool {
 
 func Auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pass := os.Getenv("TODO_PASSWORD")
+		//pass := os.Getenv("TODO_PASSWORD")
+		pass := config.PassConfig
 		if len(pass) == 0 {
 			// Если пароль не определен, возвращаем ошибку авторизации
 			http.Error(w, "Authorization required", http.StatusUnauthorized)

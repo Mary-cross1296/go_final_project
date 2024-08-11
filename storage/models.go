@@ -1,5 +1,7 @@
 package storage
 
+import "database/sql"
+
 // Task представляет задачу
 type Task struct {
 	ID      string `json:"id"`
@@ -7,4 +9,8 @@ type Task struct {
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
 	Repeat  string `json:"repeat"`
+}
+
+type DataBase struct {
+	*sql.DB
 }

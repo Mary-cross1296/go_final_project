@@ -56,7 +56,7 @@ func NowBeforeNextDate(now time.Time, nextDate time.Time, negativeNum int, minNu
 		for _, day := range daysNum {
 			// Проверка даты для положительного числа из массива
 			if day > 0 && negativeNum == 0 && day == nextDate.Day() {
-				return nextDate.Format("20060102"), nil
+				return nextDate.Format(DateTemplate), nil
 			}
 
 			if day > 0 && negativeNum == 1 && day == nextDate.Day() {
@@ -65,18 +65,18 @@ func NowBeforeNextDate(now time.Time, nextDate time.Time, negativeNum int, minNu
 				if nextDate.Day() <= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() {
 					nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
-					return nextDate.Format("20060102"), nil
+					return nextDate.Format(DateTemplate), nil
 				} else if nextDate.Day() >= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
+					return allegedNextDate.Format(DateTemplate), nil
 				}
-				return nextDate.Format("20060102"), nil
+				return nextDate.Format(DateTemplate), nil
 			}
 
 			if len(daysNum) == 1 && negativeNum == 1 {
 				allegedNextDate := CalculatAllegedNextDate(nextDate, day)
 				if nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
+					return allegedNextDate.Format(DateTemplate), nil
 				}
 			}
 
@@ -87,10 +87,10 @@ func NowBeforeNextDate(now time.Time, nextDate time.Time, negativeNum int, minNu
 				if nextDate.Day() <= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() {
 					nextDate = time.Date(nextDate.Year(), nextDate.Month(), minNumDay, 0, 0, 0, 0, nextDate.Location())
-					return nextDate.Format("20060102"), nil
+					return nextDate.Format(DateTemplate), nil
 				} else if nextDate.Day() >= minNumDay &&
 					nextDate.Day() <= allegedNextDate.Day() {
-					return allegedNextDate.Format("20060102"), nil
+					return allegedNextDate.Format(DateTemplate), nil
 				}
 			}
 
@@ -106,9 +106,9 @@ func NowBeforeNextDate(now time.Time, nextDate time.Time, negativeNum int, minNu
 				// Вычисляем дату, которая происходит раньше
 				if allegedNextDate1.Day() >= nextDate.Day() &&
 					allegedNextDate2.Day() > nextDate.Day() {
-					return allegedNextDate2.Format("20060102"), nil
+					return allegedNextDate2.Format(DateTemplate), nil
 				} else {
-					return allegedNextDate1.Format("20060102"), nil
+					return allegedNextDate1.Format(DateTemplate), nil
 				}
 			}
 		}

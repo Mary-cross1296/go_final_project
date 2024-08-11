@@ -6,19 +6,20 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Mary-cross1296/go_final_project/config"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func OpenDataBase(tableName string) (*sql.DB, error) {
+func OpenDataBase(tableName string) (*DataBase, error) {
 	db, err := sql.Open("sqlite3", tableName)
 	if err != nil {
 		log.Printf("Error opening database: %s\n", err)
 		return nil, err
 	}
-	return db, nil
+	return &DataBase{db}, nil
 }
 
-func CreateTableWithIndex(db *sql.DB) error {
+func CreateTableWithIndex(db *DataBase) error {
 	createTableRequest := `
 	CREATE TABLE scheduler (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,11 +45,11 @@ func CreateTableWithIndex(db *sql.DB) error {
 	return nil
 }
 
-func ChekingDataBase() error {
-	tableName := "scheduler.db"
-
-	appPath, err := os.Executable()
-	log.Printf("ChekingDataBase() %v", appPath)
+func ChekingDataBase(tableName string) error {
+	//appPath, err := os.Executable()
+	appPath, err := os.Getwd()
+	//log.Printf("ChekingDataBase() appPath %v", appPath)
+	//log.Printf("ChekingDataBase() appPath1 %v", appPath1)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,14 +57,15 @@ func ChekingDataBase() error {
 	// Определение пути к файлу БД. Создаем две переменные:
 	// в первой dbFile путь из переменной окружения
 	// во второй dbFileDefualt путь к базе данных по умолчанию
-	dbFile := os.Getenv("TODO_DBFILE")
-	log.Printf("Отладка 1 TODO_DBFILE %v", os.Getenv("TODO_DBFILE"))
+	//dbFile := os.Getenv("TODO_DBFILE")
+	dbFile := config.DBPathConfig
+	//log.Printf("Отладка 1 TODO_DBFILE %v", os.Getenv("TODO_DBFILE"))
 	dbFileDefualt := filepath.Join(filepath.Dir(appPath), tableName)
-	log.Printf("Отладка 2 dbFileDefualt %v", dbFileDefualt)
+	//log.Printf("Отладка 2 dbFileDefualt %v", dbFileDefualt)
 
 	if dbFile == "" {
 		dbFile = dbFileDefualt
-		log.Printf("Отладка 3 dbFile %v", dbFile)
+		//log.Printf("Отладка 3 dbFile %v", dbFile)
 		_, err = os.Stat(dbFile)
 		if err != nil {
 			log.Printf("Database file information missing: %s \nA new database file will be created... \n", err)
@@ -81,7 +83,7 @@ func ChekingDataBase() error {
 				return err
 			}
 		} else {
-			log.Println("1 The database file already exists")
+			log.Println("The database file already exists")
 		}
 	} else {
 		_, err = os.Stat(dbFile)
@@ -101,7 +103,7 @@ func ChekingDataBase() error {
 				return err
 			}
 		}
-		log.Println("2 The database file already exists")
+		log.Println("The database file already exists")
 	}
 	return nil
 }

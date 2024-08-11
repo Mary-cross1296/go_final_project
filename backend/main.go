@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/Mary-cross1296/go_final_project/api"
+	"github.com/Mary-cross1296/go_final_project/config"
 	"github.com/Mary-cross1296/go_final_project/storage"
 	"github.com/Mary-cross1296/go_final_project/utils"
-	"github.com/joho/godotenv"
 )
 
 // Глобальная переменная для подключения к базе данных
@@ -22,21 +22,26 @@ var Db *sql.DB
 const TableName = "scheduler.db"
 
 func main() {
-	//Загрузка переменных окружения
-	err := godotenv.Load()
-	if err != nil {
-		log.Print("Error loading .env file")
-	}
+	envPath := "../config/.env"
+
+	// Загрузка переменных окружения
+	config.LoadEnvVar(envPath)
+
+	// Инициализация глобальных переменных со значениями перменных окружения
+	config.Init()
 
 	// Определение порта
-	port := os.Getenv("TODO_PORT")
+	//port := os.Getenv("TODO_PORT")
+	port := config.PortConfig
+	//fmt.Printf("Отладка переменная TODO_PASSWORD %v \n", config.PassConfig)
 	defaultPort := 7540 // Порт по умолчанию
 	if port == "" {
 		port = strconv.Itoa(defaultPort)
 	}
 
 	// Определение директории для файлов
-	webDir := os.Getenv("TODO_WEB_DIR")
+	//webDir := os.Getenv("TODO_WEB_DIR")
+	webDir := config.WebDirPathConfig
 	if webDir == "" {
 		webDir = "../web" // Путь по умолчанию для локального запуска
 	}
