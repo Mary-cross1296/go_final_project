@@ -1,4 +1,4 @@
-package dateCalc
+package dates
 
 import (
 	"errors"

@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/Mary-cross1296/go_final_project/auth"
-	"github.com/Mary-cross1296/go_final_project/dateCalc"
+	"github.com/Mary-cross1296/go_final_project/config"
+	"github.com/Mary-cross1296/go_final_project/dates"
 	"github.com/Mary-cross1296/go_final_project/storage"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
@@ -28,14 +29,14 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	repeat := r.FormValue("repeat")
 
 	// Преобразуем параметр "now" в формат time.Time
-	now, err := time.Parse(dateCalc.DateTemplate, nowTime)
+	now, err := time.Parse(dates.DateTemplate, nowTime)
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "NextDateHandler(): Invalid 'now' parameter format. Use YYYYMMDD"}, http.StatusBadRequest)
 		return
 	}
 
 	// Вызываем функцию NextDate для получения следующей даты
-	nextDate, err := dateCalc.NextDate(now, date, repeat)
+	nextDate, err := dates.NextDate(now, date, repeat)
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: err.Error()}, http.StatusBadRequest)
 		return
@@ -76,11 +77,11 @@ func (h *Handlers) AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Если дата не указана
 	if task.Date == "" {
-		task.Date = time.Now().Format(dateCalc.DateTemplate)
+		task.Date = time.Now().Format(dates.DateTemplate)
 	}
 
 	// Проверяем формат даты
-	date, err := time.Parse(dateCalc.DateTemplate, task.Date)
+	date, err := time.Parse(dates.DateTemplate, task.Date)
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Date is not in the correct format"}, http.StatusBadRequest)
 		return
@@ -88,7 +89,7 @@ func (h *Handlers) AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверка формата поля Repeat
 	if task.Repeat != "" {
-		dateCheck, err := dateCalc.NextDate(time.Now(), task.Date, task.Repeat)
+		dateCheck, err := dates.NextDate(time.Now(), task.Date, task.Repeat)
 		if dateCheck == "" && err != nil {
 			SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler() Invalid repetition condition"}, http.StatusBadRequest)
 			return
@@ -99,10 +100,10 @@ func (h *Handlers) AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if date.Before(now) {
 
 		if task.Repeat == "" || date.Truncate(24*time.Hour) == date.Truncate(24*time.Hour) {
-			task.Date = time.Now().Format(dateCalc.DateTemplate)
+			task.Date = time.Now().Format(dates.DateTemplate)
 		} else {
-			dateStr := date.Format(dateCalc.DateTemplate)
-			nextDate, err := dateCalc.NextDate(now, dateStr, task.Repeat)
+			dateStr := date.Format(dates.DateTemplate)
+			nextDate, err := dates.NextDate(now, dateStr, task.Repeat)
 			if err != nil {
 				SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Wrong repetition rule"}, http.StatusBadRequest)
 				return
@@ -168,7 +169,7 @@ func (h *Handlers) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		var searchDate time.Time
 		// Попробуем распознать дату в формате "ггггммдд"
-		searchDate, err = time.Parse(dateCalc.DateTemplate, search)
+		searchDate, err = time.Parse(dates.DateTemplate, search)
 		if err != nil || searchDate.Year() == 1 {
 			// Если не получилось, попробуем распознать дату в формате "дд.мм.гггг"
 			searchDate, err = time.Parse("02.01.2006", search)
@@ -177,7 +178,7 @@ func (h *Handlers) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case err == nil:
 			// Если удалось распознать дату, делаем запрос по дате
-			searchDateStr := searchDate.Format(dateCalc.DateTemplate)
+			searchDateStr := searchDate.Format(dates.DateTemplate)
 			rows, err = h.DB.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE date = ? ORDER BY date DESC LIMIT ?", searchDateStr, MaxTasksLimit)
 			if err != nil {
 				SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error executing database query"}, http.StatusInternalServerError)
@@ -308,11 +309,11 @@ func (h *Handlers) SaveTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Если дата не указана
 	if task.Date == "" {
-		task.Date = time.Now().Format(dateCalc.DateTemplate)
+		task.Date = time.Now().Format(dates.DateTemplate)
 	}
 
 	// Проверяем формат даты
-	_, err = time.Parse(dateCalc.DateTemplate, task.Date)
+	_, err = time.Parse(dates.DateTemplate, task.Date)
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Date is not in the correct format"}, http.StatusBadRequest)
 		return
@@ -408,7 +409,7 @@ func (h *Handlers) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		// Определяем следующую дату задачи
-		newTaskDate, err := dateCalc.NextDate(now, task.Date, task.Repeat)
+		newTaskDate, err := dates.NextDate(now, task.Date, task.Repeat)
 		if err != nil {
 			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Incorrect task repetition condition"}, http.StatusBadRequest)
 			return
@@ -516,7 +517,7 @@ func UserAuthorizationHandler(w http.ResponseWriter, r *http.Request) {
 		claims,
 	})
 
-	tokenString, err := token.SignedString([]byte(auth.JwtKey))
+	tokenString, err := token.SignedString([]byte(config.JwtKeyConfig))
 	if err != nil {
 		SendErrorResponse(w, ErrorResponse{Error: "UserAuthorizationHandler(): Token signing error"}, http.StatusInternalServerError)
 		return

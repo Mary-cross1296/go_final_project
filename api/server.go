@@ -15,7 +15,7 @@ type Handlers struct {
 }
 
 // Функция для создания и запуска HTTP сервера
-func HttpServer(port, wd string, db *storage.DataBase) *http.Server {
+func HttpServer(port, wd string, db *storage.DataBase) (*http.Server, error) {
 	// Создание роутера
 	router := mux.NewRouter()
 
@@ -42,12 +42,12 @@ func HttpServer(port, wd string, db *storage.DataBase) *http.Server {
 	}
 
 	// Запуск сервера на указанном порту
-	log.Printf("Сервер запущен на порту %v\n", port)
+	log.Printf("Server is running on port %v\n", port)
 	go func() {
-		err := httpServer.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			log.Fatal("Http server error \n", err)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("Http server error: %s\n", err)
 		}
 	}()
-	return &httpServer
+
+	return &httpServer, nil
 }

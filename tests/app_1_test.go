@@ -25,22 +25,17 @@ func getURL(path string) string {
 	path = strings.TrimPrefix(path, "../web/")
 
 	path = strings.ReplaceAll(path, `\`, `/`)
-
-	//fmt.Printf("path %s \n", path)
-
 	return fmt.Sprintf("http://localhost:%d/%s", port, path)
 }
 
 func getBody(path string) ([]byte, error) {
 	url := getURL(path)
-	//fmt.Printf("Запрашиваемый URL: %s \n", url) // Отладочный вывод
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
-	//fmt.Printf("Полученный ответ: %s \n", string(body)) // Отладочный вывод
 	return body, err
 }
 

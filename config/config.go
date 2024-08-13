@@ -12,6 +12,7 @@ var (
 	PortConfig       string
 	DBPathConfig     string
 	WebDirPathConfig string
+	JwtKeyConfig     string
 )
 
 // Загрузка переменных окружения
@@ -30,4 +31,5 @@ func Init() {
 	PortConfig = os.Getenv("TODO_PORT")
 	DBPathConfig = os.Getenv("TODO_DBFILE")
 	WebDirPathConfig = os.Getenv("TODO_WEB_DIR")
+	JwtKeyConfig = os.Getenv("TODO_JWT_KEY")
 }

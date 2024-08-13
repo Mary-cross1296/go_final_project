@@ -7,7 +7,6 @@ import (
 	"github.com/Mary-cross1296/go_final_project/api"
 	"github.com/Mary-cross1296/go_final_project/config"
 	"github.com/Mary-cross1296/go_final_project/storage"
-	"github.com/Mary-cross1296/go_final_project/utils"
 )
 
 const TableName = "scheduler.db"
@@ -48,13 +47,6 @@ func main() {
 	_, err = api.HttpServer(port, webDir, db)
 	if err != nil {
 		log.Fatalf("Main(): Error starting server: %s\n", err)
-	}
-
-	// Получение и обновление токена
-	if err := utils.GetAndUpdateToken(); err != nil {
-		log.Printf("Error updating token: %v\n", err)
-	} else {
-		log.Println("Token updated successfully")
 	}
 
 	// Ожидание завершения работы сервера
