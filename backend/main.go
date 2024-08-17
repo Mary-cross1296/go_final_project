@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"strconv"
 
 	"github.com/Mary-cross1296/go_final_project/api"
@@ -43,12 +44,15 @@ func main() {
 	}
 	defer db.Close()
 
-	// Создание и запуск сервера
-	_, err = api.HttpServer(port, webDir, db)
+	// Создание сервера
+	server, err := api.HttpServer(port, webDir, db)
 	if err != nil {
 		log.Fatalf("Main(): Error starting server: %s\n", err)
 	}
 
-	// Ожидание завершения работы сервера
-	select {}
+	// Запуск сервера и ожидание его завершения
+	log.Printf("Server is running on port %v\n", port)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Main(): Error occurred while running server: %s\n", err)
+	}
 }
