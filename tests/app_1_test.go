@@ -21,12 +21,16 @@ func getURL(path string) string {
 			port = int(eport)
 		}
 	}
-	path = strings.ReplaceAll(strings.TrimPrefix(path, `../web/`), `\`, `/`)
+	path = strings.TrimPrefix(path, "..\\web\\")
+	path = strings.TrimPrefix(path, "../web/")
+
+	path = strings.ReplaceAll(path, `\`, `/`)
 	return fmt.Sprintf("http://localhost:%d/%s", port, path)
 }
 
 func getBody(path string) ([]byte, error) {
-	resp, err := http.Get(getURL(path))
+	url := getURL(path)
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -68,5 +72,5 @@ func TestApp(t *testing.T) {
 		assert.Equal(t, len(fbody), len(body), `сервер возвращает для %s данные другого размера`, fname)
 		return nil
 	}
-	assert.NoError(t, walkDir("../web", cmp))
+	assert.NoError(t, walkDir("../web/", cmp))
 }
