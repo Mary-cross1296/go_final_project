@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -112,23 +111,11 @@ func (h *Handlers) AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	query := "INSERT INTO scheduler (date, title, comment, repeat) VALUES (?, ?, ?, ?)"
-
-	res, err := h.DB.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
+	id, err := storage.InsertTask(h.DB, task)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Error executing request"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler():" + err.Error()}, http.StatusInternalServerError)
 		return
 	}
-
-	// Получаем ID добавленной задачи
-	id, err := res.LastInsertId()
-	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "AddTaskHandler(): Error getting task ID"}, http.StatusInternalServerError)
-		return
-	}
-
-	// Устанавливаем полученный id в качестве строки
-	task.ID = fmt.Sprint(id)
 
 	response := map[string]interface{}{"id": id}
 	responseId, err := json.Marshal(response)
@@ -141,32 +128,27 @@ func (h *Handlers) AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseId)
 }
 
-// Обрабатчик Get-запросов на получение списка ближайших задач
 func (h *Handlers) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса
 	if r.Method != http.MethodGet {
-		SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Method not supported"}, http.StatusMethodNotAllowed)
+		SendErrorResponse(w, ErrorResponse{Error: "GetTasksHandler(): Method not supported"}, http.StatusMethodNotAllowed)
 		return
 	}
 
-	var tasks []storage.Task
-	var task storage.Task
+	search := r.FormValue("search")
+
 	var rows *sql.Rows
 	var err error
 
-	search := r.FormValue("search")
-
 	switch {
 	case search == "":
-		// Делаем запрос по поиску всех задач с сортировкой по дате
-		rows, err = h.DB.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date DESC LIMIT ?", MaxTasksLimit)
+		// Запрос всех задач с сортировкой по дате
+		rows, err = storage.GetAllTask(h.DB, MaxTasksLimit)
 		if err != nil {
-			SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error executing database query"}, http.StatusInternalServerError)
+			SendErrorResponse(w, ErrorResponse{Error: "GetTasksHandler():" + err.Error()}, http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
-
-	default:
+	case err == nil && search != "":
 		var searchDate time.Time
 		// Попробуем распознать дату в формате "ггггммдд"
 		searchDate, err = time.Parse(dates.DateTemplate, search)
@@ -175,55 +157,39 @@ func (h *Handlers) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 			searchDate, err = time.Parse("02.01.2006", search)
 		}
 
-		switch {
-		case err == nil:
+		if err == nil {
 			// Если удалось распознать дату, делаем запрос по дате
-			searchDateStr := searchDate.Format(dates.DateTemplate)
-			rows, err = h.DB.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE date = ? ORDER BY date DESC LIMIT ?", searchDateStr, MaxTasksLimit)
+			rows, err = storage.GetTaskByDate(h.DB, MaxTasksLimit, searchDate)
 			if err != nil {
-				SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error executing database query"}, http.StatusInternalServerError)
+				SendErrorResponse(w, ErrorResponse{Error: "GetTasksHandler():" + err.Error()}, http.StatusInternalServerError)
 				return
 			}
-			defer rows.Close()
-
-		default:
-			// Если дата не распознана, делаем запрос по подстроке в title или comment
-			searchParam := "%" + search + "%"
-			rows, err = h.DB.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE title LIKE ? OR comment LIKE ? ORDER BY date DESC LIMIT ?", searchParam, searchParam, MaxTasksLimit)
+		} else {
+			// Иначе выполняем поиск по подстроке в title или comment
+			rows, err = storage.GetTaskByString(h.DB, search, MaxTasksLimit)
 			if err != nil {
-				SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error executing database query"}, http.StatusInternalServerError)
+				SendErrorResponse(w, ErrorResponse{Error: "GetTasksHandler():" + err.Error()}, http.StatusInternalServerError)
 				return
 			}
-			defer rows.Close()
 		}
 	}
 
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat); err != nil {
-			SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler():  Error scanning information received from the database"}, http.StatusInternalServerError)
-			return
+	defer func() {
+		if rows != nil {
+			rows.Close()
 		}
-		task.ID = fmt.Sprint(id)
-		tasks = append(tasks, task)
-	}
+	}()
 
-	// Обработка ошибок, возникшик при итерации
-	if rows.Err() != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): Error occurred during rows iteration"}, http.StatusInternalServerError)
+	tasks, err := storage.ScanResult(rows)
+	if err != nil {
+		SendErrorResponse(w, ErrorResponse{Error: "GetTasksHandler():" + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 
-	// Если список задач пустой, возвращаем пустой массив
-	if len(tasks) == 0 {
-		tasks = []storage.Task{} // или просто nil, но не пустой массив
-	}
-
-	// Формируем ответ в формате JSON объекта с ключом "tasks"
 	responseMap := map[string][]storage.Task{"tasks": tasks}
 	response, err := json.Marshal(responseMap)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "GetListUpcomingTasksHandler(): JSON generation error"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "GetTasksHandler(): JSON generation error"}, http.StatusInternalServerError)
 		return
 	}
 
@@ -246,10 +212,9 @@ func (h *Handlers) GetTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var task storage.Task
-	var id int64
+	idParamNum, _ := strconv.Atoi(idParam)
 
-	err := h.DB.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParam).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	task, err := storage.GetTaskByID(h.DB, idParamNum)
 	if err == sql.ErrNoRows {
 		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): Task not found"}, http.StatusNotFound)
 		return
@@ -257,8 +222,6 @@ func (h *Handlers) GetTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 		SendErrorResponse(w, ErrorResponse{Error: "GetTaskForEdit(): Error retrieving task data"}, http.StatusInternalServerError)
 		return
 	}
-
-	task.ID = fmt.Sprint(id)
 
 	// Формируем ответ в формате JSON объекта с ключом "tasks"
 	response, err := json.Marshal(task)
@@ -328,23 +291,13 @@ func (h *Handlers) SaveTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Выполняем запрос UPDATE в базу данных
-	query := "UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat =? WHERE id = ?"
-
-	result, err := h.DB.Exec(query, task.Date, task.Title, task.Comment, task.Repeat, task.ID)
+	err = storage.UpdateTask(h.DB, task)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Task not found"}, http.StatusInternalServerError)
-		return
-	}
-
-	// Проверяем кол-во затронутых строк
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Error retrieving update result"}, http.StatusInternalServerError)
-		return
-	}
-
-	if rowsAffected == 0 {
-		SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Task not found"}, http.StatusInternalServerError)
+		if err.Error() == "no rows affected" {
+			SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler():" + err.Error()}, http.StatusNotFound)
+		} else {
+			SendErrorResponse(w, ErrorResponse{Error: "SaveEditTaskHandler(): Internal server error"}, http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -372,39 +325,19 @@ func (h *Handlers) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	idParamNum, _ := strconv.Atoi(idParam)
 
-	var task storage.Task
-	var id int64
-	err := h.DB.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?", idParamNum).Scan(&id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-	task.ID = fmt.Sprint(id)
-
+	task, err := storage.GetTaskByID(h.DB, idParamNum)
 	if err != nil {
-		switch {
-		case err == sql.ErrNoRows:
-			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusNotFound)
-			return
-		default:
-			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Error retrieving task data"}, http.StatusInternalServerError)
-			return
-		}
+		SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler():" + err.Error()}, http.StatusBadRequest)
+		return
 	}
 
 	now := time.Now()
 
 	switch task.Repeat {
 	case "":
-		query := "DELETE FROM scheduler WHERE id = ?"
-		task.ID = fmt.Sprint(id)
-		result, err := h.DB.Exec(query, task.ID)
+		err = storage.DeleteTaskByID(h.DB, idParamNum)
 		if err != nil {
-			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Error deleting task"}, http.StatusInternalServerError)
-			return
-		}
-
-		// Проверка количества затронутых строк
-		rowsAffected, err := result.RowsAffected()
-		if err != nil || rowsAffected == 0 {
-			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found or not deleted"}, http.StatusInternalServerError)
-			return
+			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler():" + err.Error()}, http.StatusBadRequest)
 		}
 
 	default:
@@ -417,11 +350,9 @@ func (h *Handlers) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 		// Изменяем дату задачи на новую
 		task.Date = newTaskDate
 
-		// Выполняем запрос UPDATE в базу данных
-		query := "UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat =? WHERE id = ?"
-		_, err = h.DB.Exec(query, task.Date, &task.Title, &task.Comment, &task.Repeat, &task.ID)
+		err = storage.UpdateTask(h.DB, task)
 		if err != nil {
-			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler(): Task not found"}, http.StatusInternalServerError)
+			SendErrorResponse(w, ErrorResponse{Error: "DoneTaskHandler():" + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
@@ -450,22 +381,9 @@ func (h *Handlers) DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := "DELETE FROM scheduler WHERE id = ?"
-	result, err := h.DB.Exec(query, idParamNum)
+	err = storage.DeleteTaskByID(h.DB, idParamNum)
 	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Error deleting task"}, http.StatusInternalServerError)
-		return
-	}
-
-	// Проверка количества затронутых строк
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Unable to determine the number of rows affected after deleting a task"}, http.StatusInternalServerError)
-		return
-	}
-
-	if rowsAffected == 0 {
-		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler(): Task not found"}, http.StatusInternalServerError)
+		SendErrorResponse(w, ErrorResponse{Error: "DeleteTaskHandler():" + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 

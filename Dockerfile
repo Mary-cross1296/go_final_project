@@ -16,7 +16,7 @@ ENV CGO_ENABLED=1 \
     TODO_WEB_DIR="/app/web"
 
 # Компилируем программу
-RUN CGO_ENABLED=1 GOOS=linux go build -o /app/backend/main ./backend/main.go
+RUN go build -o /app/backend/main ./backend/main.go
 
 # Устанавливаем рабочую директорию
 WORKDIR /app/backend
